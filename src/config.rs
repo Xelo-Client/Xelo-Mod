@@ -29,6 +29,9 @@ pub struct ModConfig {
     
     #[serde(rename = "cape_physics")]
     pub cape_physics: bool,
+    
+    #[serde(rename = "night_vision")]
+    pub night_vision: bool,
     // You can add more fields as needed
     // #[serde(rename = "CustomField")]
     // pub custom_field: bool,
@@ -140,6 +143,10 @@ pub fn is_classic_skins_enabled() -> bool {
 
 pub fn is_cape_physics_enabled() -> bool {
     get_config().cape_physics
+}
+
+pub fn is_night_vision_enabled() -> bool {
+    get_config().night_vision
 }
 // You can add more helper functions for other config values
 // pub fn is_custom_field_enabled() -> bool {
