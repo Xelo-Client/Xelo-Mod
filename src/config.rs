@@ -27,9 +27,6 @@ pub struct ModConfig {
     #[serde(rename = "classic_skins")]
     pub classic_skins: bool,
     
-    #[serde(rename = "threed_skin_layer")]
-    pub threed_skin_layer: bool,
-    
     #[serde(rename = "cape_physics")]
     pub cape_physics: bool,
     // You can add more fields as needed
@@ -46,7 +43,6 @@ impl Default for ModConfig {
             java_clouds: false,
             java_cubemap: false,
             classic_skins: false,
-            threed_skin_layer: false,
             cape_physics: false,
             // custom_field: false,
         }
@@ -140,10 +136,6 @@ pub fn is_java_cubemap_enabled() -> bool {
 
 pub fn is_classic_skins_enabled() -> bool {
     get_config().classic_skins
-}
-
-pub fn is_threed_skin_layer_enabled() -> bool {
-    get_config().threed_skin_layer
 }
 
 pub fn is_cape_physics_enabled() -> bool {
