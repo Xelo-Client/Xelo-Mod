@@ -29,6 +29,9 @@ static WANTED_ASSETS: Lazy<Mutex<HashMap<AAssetPtr, Cursor<Vec<u8>>>>> =
 const LEGACY_CUBEMAP_MATERIAL_BIN: &[u8] = include_bytes!("java_cubemap/LegacyCubemap.material.bin");
 const RENDER_CHUNK_MATERIAL_BIN: &[u8] = include_bytes!("no_fog_materials/RenderChunk.material.bin");
 
+const MOBS_JSON: &[u8] = include_bytes!("cape_physics/mobs.json");
+const PLAYER_ANIMATION_JSON: &[u8] = include_bytes!("cape_physics/player.animation.json");
+
 const RENDER_CHUNK_NV_MATERIAL_BIN: &[u8] = include_bytes!("nightvision_materials/RenderChunk.material.bin");
 
 const CUSTOM_SPLASHES_JSON: &str = r#"{"splashes":["Origin Client","Origin > any other client","The Best Client!!","BlueCat","Origin is so much better","Origin Optimizes like no other client","Make Sure to star our repository:https://github.com/Origin-Client/Origin","Contributions open!","Made by the community, for the community","Yami is goated!!"]}"#;
