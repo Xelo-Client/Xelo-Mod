@@ -47,6 +47,7 @@ impl Default for ModConfig {
             java_cubemap: false,
             classic_skins: false,
             cape_physics: false,
+            night_vision: false
             // custom_field: false,
         }
     }
