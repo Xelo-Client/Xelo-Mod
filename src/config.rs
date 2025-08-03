@@ -35,6 +35,9 @@ pub struct ModConfig {
     
     #[serde(rename = "xelo_title")]
     pub xelo_title: bool,
+    
+    #[serde(rename = "client_capes")]
+    pub client_capes: bool,
     // You can add more fields as needed
     // #[serde(rename = "CustomField")]
     // pub custom_field: bool,
@@ -52,6 +55,7 @@ impl Default for ModConfig {
             cape_physics: false,
             night_vision: false,
             xelo_title: true,
+            client_capes: false,
             // custom_field: false,
         }
     }
@@ -157,6 +161,11 @@ pub fn is_night_vision_enabled() -> bool {
 pub fn is_xelo_title_enabled() -> bool {
     get_config().xelo_title
 }
+
+pub fn is_client_capes_enabled() -> bool {
+    get_config().client_capes
+}
+
 // You can add more helper functions for other config values
 // pub fn is_custom_field_enabled() -> bool {
 //     get_config().custom_field
