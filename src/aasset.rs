@@ -1,5 +1,5 @@
 use crate::ResourceLocation;
-use crate::config::{is_no_hurt_cam_enabled, is_no_fog_enabled, is_java_cubemap_enabled, is_particles_disabler_enabled, is_java_clouds_enabled, is_classic_skins_enabled, is_cape_physics_enabled, is_night_vision_enabled};
+use crate::config::{is_no_hurt_cam_enabled, is_no_fog_enabled, is_java_cubemap_enabled, is_particles_disabler_enabled, is_java_clouds_enabled, is_classic_skins_enabled, is_cape_physics_enabled, is_night_vision_enabled, is_xelo_title_enabled};
 use libc::{off64_t, off_t};
 use materialbin::{CompiledMaterialDefinition, MinecraftVersion};
 use ndk::asset::Asset;
@@ -28,6 +28,8 @@ static WANTED_ASSETS: Lazy<Mutex<HashMap<AAssetPtr, Cursor<Vec<u8>>>>> =
 
 const LEGACY_CUBEMAP_MATERIAL_BIN: &[u8] = include_bytes!("java_cubemap/LegacyCubemap.material.bin");
 const RENDER_CHUNK_MATERIAL_BIN: &[u8] = include_bytes!("no_fog_materials/RenderChunk.material.bin");
+
+const TITLE_PNG: &[u8] = include_bytes!("minecraft_title_5.png");
 
 const MOBS_JSON: &[u8] = include_bytes!("cape_physics/mobs.json");
 const PLAYER_ANIMATION_JSON: &[u8] = include_bytes!("cape_physics/player.animation.json");
@@ -124,6 +126,17 @@ fn get_java_cubemap_material_data(filename: &str) -> Option<&'static [u8]> {
     
     match filename {
         "LegacyCubemap.material.bin" => Some(LEGACY_CUBEMAP_MATERIAL_BIN),
+        _ => None,
+    }
+}
+
+fn get_title_png_data(filename: &str) -> Option<&'static [u8]> {
+    if !is_xelo_title_enabled() {
+        return None;
+    }
+    
+    match filename {
+        "title.png" => Some(TITLE_PNG),
         _ => None,
     }
 }
@@ -431,6 +444,14 @@ pub(crate) unsafe fn open(
     if let Some(java_cubemap_data) = get_java_cubemap_material_data(&filename_str) {
         log::info!("Intercepting {} with java-cubemap material (java-cubemap enabled)", filename_str);
         let buffer = java_cubemap_data.to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+    
+    if let Some(title_png_data) = get_title_png_data(&filename_str) {
+        log::info!("Intercepting {} with xelo title png (xelo-title enabled)", filename_str);
+        let buffer = title_png_data.to_vec();
         let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;

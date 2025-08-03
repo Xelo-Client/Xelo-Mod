@@ -32,6 +32,9 @@ pub struct ModConfig {
     
     #[serde(rename = "night_vision")]
     pub night_vision: bool,
+    
+    #[serde(rename = "xelo_title")]
+    pub xelo_title: bool,
     // You can add more fields as needed
     // #[serde(rename = "CustomField")]
     // pub custom_field: bool,
@@ -47,7 +50,8 @@ impl Default for ModConfig {
             java_cubemap: false,
             classic_skins: false,
             cape_physics: false,
-            night_vision: false
+            night_vision: false,
+            xelo_title: true,
             // custom_field: false,
         }
     }
@@ -148,6 +152,10 @@ pub fn is_cape_physics_enabled() -> bool {
 
 pub fn is_night_vision_enabled() -> bool {
     get_config().night_vision
+}
+
+pub fn is_xelo_title_enabled() -> bool {
+    get_config().xelo_title
 }
 // You can add more helper functions for other config values
 // pub fn is_custom_field_enabled() -> bool {
