@@ -29,7 +29,12 @@ static WANTED_ASSETS: Lazy<Mutex<HashMap<AAssetPtr, Cursor<Vec<u8>>>>> =
 const LEGACY_CUBEMAP_MATERIAL_BIN: &[u8] = include_bytes!("java_cubemap/LegacyCubemap.material.bin");
 const RENDER_CHUNK_MATERIAL_BIN: &[u8] = include_bytes!("no_fog_materials/RenderChunk.material.bin");
 
-const CAPE_TEXTURE_PATH: &str = "/storage/emulated/0/Android/data/com.origin.launcher/files/origin_mods/xelo_cape.png";
+const CAPE_TEXTURE_PATHS: &[&str] = &[
+    "/storage/emulated/0/Android/data/com.origin.launcher/files/origin_mods/xelo_cape.png",
+    "/storage/emulated/0/Android/data/com.mojang.minecraftpe/files/origin_mods/xelo_cape.png",
+    "/sdcard/Android/data/com.origin.launcher/files/origin_mods/xelo_cape.png",
+    "/sdcard/origin_mods/xelo_cape.png",
+];
 
 const TITLE_PNG: &[u8] = include_bytes!("minecraft_title_5.png");
 
@@ -44,11 +49,12 @@ const CUSTOM_FIRST_PERSON_JSON: &str = r#"{"format_version":"1.18.10","minecraft
 const CUSTOM_THIRD_PERSON_JSON: &str = r#"{"format_version":"1.18.10","minecraft:camera_entity":{"description":{"identifier":"minecraft:third_person"},"components":{"minecraft:camera":{"field_of_view":66,"near_clipping_plane":0.025,"far_clipping_plane":2500},"minecraft:camera_third_person":{},"minecraft:camera_render_player_model":{},"minecraft:camera_attach_to_player":{},"minecraft:camera_offset":{"view":[0,0],"entity":[0,2,5]},"minecraft:camera_look_at_player":{},"minecraft:camera_orbit":{"azimuth_smoothing_spring":0,"polar_angle_smoothing_spring":0,"distance_smoothing_spring":0,"polar_angle_min":0.1,"polar_angle_max":179.9,"radius":4},"minecraft:camera_avoidance":{"relax_distance_smoothing_spring":0,"distance_constraint_min":0.25},"minecraft:camera_perspective_option":{"view_mode":"third_person"},"minecraft:update_player_from_camera":{"look_mode":"along_camera"},"minecraft:camera_player_sleep_vignette":{},"minecraft:gameplay_affects_fov":{},"minecraft:allow_inside_block":{},"minecraft:extend_player_rendering":{}}}}"#;
 const CUSTOM_THIRD_PERSON_FRONT_JSON: &str = r#"{"format_version":"1.18.10","minecraft:camera_entity":{"description":{"identifier":"minecraft:third_person_front"},"components":{"minecraft:camera":{"field_of_view":66,"near_clipping_plane":0.025,"far_clipping_plane":2500},"minecraft:camera_third_person":{},"minecraft:camera_render_player_model":{},"minecraft:camera_attach_to_player":{},"minecraft:camera_offset":{"view":[0,0],"entity":[0,2,5]},"minecraft:camera_look_at_player":{},"minecraft:camera_orbit":{"azimuth_smoothing_spring":0,"polar_angle_smoothing_spring":0,"distance_smoothing_spring":0,"polar_angle_min":0.1,"polar_angle_max":179.9,"radius":4,"invert_x_input":true},"minecraft:camera_avoidance":{"relax_distance_smoothing_spring":0,"distance_constraint_min":0.25},"minecraft:camera_perspective_option":{"view_mode":"third_person_front"},"minecraft:update_player_from_camera":{"look_mode":"at_camera"},"minecraft:camera_player_sleep_vignette":{},"minecraft:gameplay_affects_fov":{},"minecraft:allow_inside_block":{},"minecraft:extend_player_rendering":{}}}}"#;
 
-const CUSTOM_LOADING_MESSAGES_JSON: &str = r#"{"beginner_loading_messages":["Origin Client","Origin > any other client","The Best Client!!","BlueCat","Origin is so much better","Origin Optimizes like no other client","Make Sure to star our repository:https://github.com/Origin-Client/Origin","Contributions open!","Made by the community, for the community","Yami is goated!!"],"mid_game_loading_messages":["Origin Client","Origin > any other client","The Best Client!!","BlueCat","Origin is so much better","Origin Optimizes like no other client","Make Sure to star our repository:https://github.com/Origin-Client/Origin","Contributions open!","Made by the community, for the community","Yami is goated!!"],"late_game_loading_messages":["Origin Client","Origin > any other client","The Best Client!!","BlueCat","Origin is so much better","Origin Optimizes like no other client","Make Sure to star our repository:https://github.com/Origin-Client/Origin","Contributions open!","Made by the community, for the community","Yami is goated!!"],"creative_loading_messages":["Origin Client","Origin > any other client","The Best Client!!","BlueCat","Origin is so much better","Origin Optimizes like no other client","Make Sure to star our repository:https://github.com/Origin-Client/Origin","Contributions open!","Made by the community, for the community","Yami is goated!!"],"editor_loading_messages":["Origin Client","Origin > any other client","The Best Client!!","BlueCat","Origin is so much better","Origin Optimizes like no other client","Make Sure to star our repository:https://github.com/Origin-Client/Origin","Contributions open!","Made by the community, for the community","Yami is goated!!"],"realms_loading_messages":["Origin Client","Origin > any other client","The Best Client!!","BlueCat","Origin is so much better","Origin Optimizes like no other client","Make Sure to star our repository:https://github.com/Origin-Client/Origin","Contributions open!","Made by the community, for the community","Yami is goated!!"],"addons_loading_messages":["Origin Client","Origin > any other client","The Best Client!!","BlueCat","Origin is so much better","Origin Optimizes like no other client","Make Sure to star our repository:https://github.com/Origin-Client/Origin","Contributions open!","Made by the community, for the community","Yami is goated!!"],"store_progress_tooltips":["Origin Client","Origin > any other client","The Best Client!!","BlueCat","Origin is so much better","Origin Optimizes like no other client","Make Sure to star our repository:https://github.com/Origin-Client/Origin","Contributions open!","Made by the community, for the community","Yami is goated!!"]}"#;
+const CUSTOM_LOADING_MESSAGES_JSON: &str = r#"{"beginner_loading_messages":["Origin Client","Origin > any other client","The Best Client!!","BlueCat","Origin is so much better","Origin Optimizes like no other client","Make Sure to star our repository:https://github.com/Origin-Client/Origin","Contributions open!","Made by the community, for the community","Yami is goated!!"],"mid_game_loading_messages":["Origin Client","Origin > any other client","The Best Client!!","BlueCat","Origin is so much better","Origin Optimizes like no other client","Make Sure to star our repository:https://github.com/Origin-Client/Origin","Contributions open!","Made by the community, for the community","Yami is goated!!"],"late_game_loading_messages":["Origin Client","Origin > any other client","The Best Client!!","BlueCat","Origin is so much better","Origin Optimizes like no other client","Make Sure to star our repository:https://github.com/Origin-Client/Origin","Contributions open!","Made by the community, for the community","Yami is goated!!"],"creative_loading_messages":["Origin Client","Origin > any other client","The Best Client!!","BlueCat","Origin is so much better","Origin Optimizes like no other client","Make Sure to star our repository:https://github.com/Origin-Client/Origin","Contributions open!","Made by the community, for the community","Yami is goated!!"],"editor_loading_messages":["Origin Client","Origin > any other client","The Best Client!!","BlueCat","Origin is so much better","Origin Optimizes like no other client","Make Sure to star our repository:https://github.com/Origin-Client/Origin","Contributions open!","Made by the community, for the community","Yami is goated!!"],"realms_loading_messages":["Origin Client","Origin > any other client","The Best Client!!","BlueCat","Origin is so much better","Origin Optimizes like no other client","Make Sure to star our repository:https://github.com/Origin-Client/Origin","Contributions open!","Made by the community, for the community","Yami is goated!!"],"addons_loading_messages":["Origin Client","Origin > any other client","The Best Client!!","BlueCat","Origin is so much better","Origin Optimizes like no other client","Make Sure to star our repository:https://github.com/Origin-Client/Origin","Contributions open!","Made by the community, for the community","Yami is goaded!!"],"store_progress_tooltips":["Origin Client","Origin > any other client","The Best Client!!","BlueCat","Origin is so much better","Origin Optimizes like no other client","Make Sure to star our repository:https://github.com/Origin-Client/Origin","Contributions open!","Made by the community, for the community","Yami is goated!!"]}"#;
 
 const CUSTOM_SKINS_JSON: &str = r#"{"skins":[{"localization_name":"Steve","geometry":"geometry.humanoid.custom","texture":"steve.png","type":"free"},{"localization_name":"Alex","geometry":"geometry.humanoid.customSlim","texture":"alex.png","type":"free"}],"serialize_name":"Standard","localization_name":"Standard"}"#;
 
-const RENDER_JSON: &str = r#"{"format_version":"1.8.0","render_controllers":{"controller.render.player.cape":{"rebuild_animation_matrices":true,"geometry":"Geometry.cape","materials":[{"*":"Material.cape"}],"textures":["Texture.cape"]}}}"#;
+// Fixed: Proper cape render controller JSON
+const CAPE_RENDER_CONTROLLER_JSON: &str = r#"{"format_version":"1.8.0","render_controllers":{"controller.render.player.cape":{"rebuild_animation_matrices":true,"geometry":"Geometry.cape","materials":[{"*":"Material.cape"}],"textures":["Texture.cape"]}}}"#;
 
 const CLASSIC_STEVE_TEXTURE: &[u8] = include_bytes!("s.png");
 const CLASSIC_ALEX_TEXTURE: &[u8] = include_bytes!("a.png");
@@ -176,35 +182,42 @@ fn is_particles_folder_to_block(c_path: &Path) -> bool {
     }) || path_str.starts_with("particles") || path_str.ends_with(".particle") || path_str.ends_with("_particle.json")
 }
 
+// Fixed: Better cape_invisible texture detection
 fn is_cape_invisible_texture_file(c_path: &Path) -> bool {
     if !is_client_capes_enabled() {
         return false;
     }
     
     let path_str = c_path.to_string_lossy();
+    let filename = c_path.file_name().map(|f| f.to_string_lossy()).unwrap_or_default();
+    
+    // Check exact filename match first
+    if filename == "cape_invisible.png" {
+        log::info!("CAPE DEBUG: Found cape_invisible.png by filename: {}", path_str);
+        return true;
+    }
     
     // Check for cape_invisible texture in various possible locations
     let cape_invisible_patterns = [
+        "cape_invisible.png",
         "textures/entity/cape_invisible.png",
         "/textures/entity/cape_invisible.png",
-        "textures/entity/cape_invisible",
-        "/textures/entity/cape_invisible",
-        "entity/cape_invisible.png",
-        "/entity/cape_invisible.png",
-        "entity/cape_invisible",
-        "/entity/cape_invisible",
         "resource_packs/vanilla/textures/entity/cape_invisible.png",
         "assets/resource_packs/vanilla/textures/entity/cape_invisible.png",
         "vanilla/textures/entity/cape_invisible.png",
-        "resource_packs/vanilla/textures/entity/cape_invisible",
-        "assets/resource_packs/vanilla/textures/entity/cape_invisible",
-        "vanilla/textures/entity/cape_invisible",
     ];
     
-    cape_invisible_patterns.iter().any(|pattern| {
-        path_str.contains(pattern) || path_str.ends_with(pattern)
-    })
+    let found = cape_invisible_patterns.iter().any(|pattern| {
+        path_str.ends_with(pattern) || path_str.contains(pattern)
+    });
+    
+    if found {
+        log::info!("CAPE DEBUG: Found cape_invisible.png by pattern: {}", path_str);
+    }
+    
+    found
 }
+
 // Enhanced clouds detection with more patterns
 fn is_clouds_texture_file(c_path: &Path) -> bool {
     if !is_java_clouds_enabled() {
@@ -270,12 +283,31 @@ fn is_classic_skins_json_file(c_path: &Path) -> bool {
     is_skin_file_path(c_path, "skins.json")
 }
 
-fn is_client_capes_file(c_path: &Path) -> bool {
+// Fixed: Better cape render controllers detection
+fn is_client_capes_render_controller_file(c_path: &Path) -> bool {
     if !is_client_capes_enabled() {
         return false;
     }
     
-    is_skin_file_path(c_path, "cape.render_controllers.json")
+    let path_str = c_path.to_string_lossy();
+    let filename = c_path.file_name().map(|f| f.to_string_lossy()).unwrap_or_default();
+    
+    // Check for cape render controller files
+    let cape_controller_patterns = [
+        "cape.render_controllers.json",
+        "render_controllers/cape.json",
+        "cape_render_controllers.json",
+    ];
+    
+    let found = cape_controller_patterns.iter().any(|pattern| {
+        filename == *pattern || path_str.ends_with(pattern) || path_str.contains(pattern)
+    });
+    
+    if found {
+        log::info!("CAPE DEBUG: Found cape render controller file: {}", path_str);
+    }
+    
+    found
 }
 
 fn is_persona_file_to_block(c_path: &Path) -> bool {
@@ -322,48 +354,65 @@ fn get_cape_animation_data(filename: &str) -> Option<&'static [u8]> {
     }
 }
 
-// Function to check if this is a player.entity.json file that needs client capes modification
+// Fixed: Enhanced player.entity.json detection
 fn is_player_entity_file(c_path: &Path) -> bool {
     if !is_client_capes_enabled() {
         return false;
     }
     
     let path_str = c_path.to_string_lossy();
-    let os_filename = match c_path.file_name() {
-        Some(name) => name.to_string_lossy(),
-        None => return false,
-    };
+    let filename = c_path.file_name().map(|f| f.to_string_lossy()).unwrap_or_default();
     
-    // Check if it's player.entity.json in various possible locations
-    let player_entity_patterns = [
-        "entity/player.entity.json",
-        "/entity/player.entity.json",
-        "entities/player.entity.json", 
-        "/entities/player.entity.json",
-        "resource_packs/vanilla/entity/player.entity.json",
-        "assets/resource_packs/vanilla/entity/player.entity.json",
-        "vanilla/entity/player.entity.json",
+    // Must be exactly player.entity.json
+    if filename != "player.entity.json" {
+        return false;
+    }
+    
+    // Check if it's in expected entity directories
+    let entity_paths = [
+        "/entity/",
+        "/entities/", 
+        "resource_packs/vanilla/entity/",
+        "assets/resource_packs/vanilla/entity/",
+        "vanilla/entity/",
+        "entity/",
+        "entities/",
     ];
     
-    os_filename == "player.entity.json" && player_entity_patterns.iter().any(|pattern| {
-        path_str.contains(pattern) || path_str.ends_with(pattern)
-    })
+    let found = entity_paths.iter().any(|path| path_str.contains(path));
+    
+    if found {
+        log::info!("CAPE DEBUG: Found player.entity.json: {}", path_str);
+    } else {
+        log::debug!("CAPE DEBUG: player.entity.json not in expected path: {}", path_str);
+    }
+    
+    found
 }
 
+// Fixed: Better cape texture loading with multiple paths
 fn load_custom_cape_texture() -> Option<Vec<u8>> {
-    match std::fs::read(CAPE_TEXTURE_PATH) {
-        Ok(data) => {
-            log::info!("Successfully loaded custom cape texture from: {}", CAPE_TEXTURE_PATH);
-            Some(data)
-        }
-        Err(e) => {
-            log::warn!("Failed to load custom cape texture from {}: {}", CAPE_TEXTURE_PATH, e);
-            log::info!("Make sure xelo_cape.png exists in the origin_mods folder");
-            None
+    for cape_path in CAPE_TEXTURE_PATHS {
+        match std::fs::read(cape_path) {
+            Ok(data) => {
+                log::info!("Successfully loaded custom cape texture from: {}", cape_path);
+                return Some(data);
+            }
+            Err(e) => {
+                log::debug!("Failed to load cape from {}: {}", cape_path, e);
+            }
         }
     }
+    
+    log::warn!("Failed to load custom cape texture from any location");
+    log::info!("Make sure xelo_cape.png exists in one of these locations:");
+    for path in CAPE_TEXTURE_PATHS {
+        log::info!("  - {}", path);
+    }
+    None
 }
-// Function to modify player.entity.json to add cape render controller
+
+// Fixed: More robust JSON modification with better error handling
 fn modify_player_entity_json(original_data: &[u8]) -> Option<Vec<u8>> {
     let json_str = match std::str::from_utf8(original_data) {
         Ok(s) => s,
@@ -373,61 +422,79 @@ fn modify_player_entity_json(original_data: &[u8]) -> Option<Vec<u8>> {
         }
     };
     
+    log::debug!("CAPE DEBUG: Original player.entity.json length: {} bytes", original_data.len());
+    
     let mut json_value: Value = match serde_json::from_str(json_str) {
         Ok(v) => v,
         Err(e) => {
             log::error!("Failed to parse player.entity.json as JSON: {}", e);
+            log::debug!("JSON content preview: {}", &json_str[..std::cmp::min(200, json_str.len())]);
             return None;
         }
     };
     
-    // Navigate to the render_controllers array
-    if let Some(client_entity) = json_value
-        .get_mut("minecraft:client_entity")
-        .and_then(|ce| ce.as_object_mut())
-    {
-        if let Some(description) = client_entity
-            .get_mut("description")
-            .and_then(|desc| desc.as_object_mut())
-        {
-            if let Some(render_controllers) = description
-                .get_mut("render_controllers")
-                .and_then(|rc| rc.as_array_mut())
-            {
-                // Create the cape render controller object
-                let cape_controller = serde_json::json!({
-                    "controller.render.player.cape": "(query.armor_texture_slot(1) != 5) && (!variable.is_first_person || variable.is_paperdoll) && (!variable.map_face_icon)"
-                });
-                
-                // Check if cape controller already exists
-                let cape_exists = render_controllers.iter().any(|controller| {
-                    controller.as_object()
-                        .map(|obj| obj.contains_key("controller.render.player.cape"))
-                        .unwrap_or(false)
-                });
-                
-                if !cape_exists {
-                    render_controllers.push(cape_controller);
-                    log::info!("Added cape render controller to player.entity.json");
-                } else {
-                    log::info!("Cape render controller already exists in player.entity.json");
-                }
-            } else {
-                log::error!("render_controllers array not found in player.entity.json");
-                return None;
-            }
-        } else {
-            log::error!("description object not found in player.entity.json");
+    // Navigate to the render_controllers array with better error handling
+    let client_entity = match json_value.get_mut("minecraft:client_entity") {
+        Some(ce) => ce,
+        None => {
+            log::error!("minecraft:client_entity not found in player.entity.json");
+            log::debug!("Available top-level keys: {:?}", json_value.as_object().map(|o| o.keys().collect::<Vec<_>>()));
             return None;
         }
+    };
+    
+    let description = match client_entity.get_mut("description") {
+        Some(desc) => desc,
+        None => {
+            log::error!("description not found in minecraft:client_entity");
+            return None;
+        }
+    };
+    
+    let render_controllers = match description.get_mut("render_controllers") {
+        Some(rc) => rc,
+        None => {
+            log::error!("render_controllers not found in description");
+            // Try to create the render_controllers array if it doesn't exist
+            log::info!("Creating render_controllers array");
+            description["render_controllers"] = serde_json::json!([]);
+            description.get_mut("render_controllers").unwrap()
+        }
+    };
+    
+    let render_controllers_array = match render_controllers.as_array_mut() {
+        Some(array) => array,
+        None => {
+            log::error!("render_controllers is not an array");
+            return None;
+        }
+    };
+    
+    // Create the cape render controller object
+    let cape_controller = serde_json::json!({
+        "controller.render.player.cape": "(query.armor_texture_slot(1) != 5) && (!variable.is_first_person || variable.is_paperdoll) && (!variable.map_face_icon)"
+    });
+    
+    // Check if cape controller already exists
+    let cape_exists = render_controllers_array.iter().any(|controller| {
+        controller.as_object()
+            .map(|obj| obj.contains_key("controller.render.player.cape"))
+            .unwrap_or(false)
+    });
+    
+    if !cape_exists {
+        render_controllers_array.push(cape_controller);
+        log::info!("Added cape render controller to player.entity.json");
     } else {
-        log::error!("minecraft:client_entity not found in player.entity.json");
-        return None;  
+        log::info!("Cape render controller already exists in player.entity.json");
     }
     
     // Convert back to JSON string
     match serde_json::to_string_pretty(&json_value) {
-        Ok(modified_json) => Some(modified_json.into_bytes()),
+        Ok(modified_json) => {
+            log::debug!("CAPE DEBUG: Modified player.entity.json length: {} bytes", modified_json.len());
+            Some(modified_json.into_bytes())
+        },
         Err(e) => {
             log::error!("Failed to serialize modified player.entity.json: {}", e);
             None
@@ -451,26 +518,82 @@ pub(crate) unsafe fn open(
         return aasset;
     };
 
-    // Debug logging for features
-    
-    if is_particles_disabler_enabled() {
+    // Enhanced debug logging for client capes
+    if is_client_capes_enabled() {
         let path_str = c_path.to_string_lossy();
-        if path_str.contains("particle") || path_str.contains("effect") {
-            log::info!("Particles disabler enabled - checking file: {}", c_path.display());
+        let filename_str = os_filename.to_string_lossy();
+        
+        // Log all potentially relevant file accesses
+        if filename_str.contains("cape") || 
+           filename_str.contains("player") || 
+           filename_str.contains("entity") ||
+           path_str.contains("entity") ||
+           path_str.contains("cape") ||
+           filename_str.contains("render_controllers") {
+            log::info!("CAPE DEBUG: Checking file - Path: '{}', Filename: '{}'", path_str, filename_str);
         }
     }
+
+    // Client capes features - check these first and early return
     
+    // 1. Cape invisible texture replacement (highest priority)
     if is_cape_invisible_texture_file(c_path) {
-        log::info!("Intercepting cape_invisible texture with custom cape: {}", c_path.display());
+        log::info!("CAPE: Intercepting cape_invisible texture: {}", c_path.display());
         
         if let Some(custom_cape_data) = load_custom_cape_texture() {
             let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
             wanted_lock.insert(AAssetPtr(aasset), Cursor::new(custom_cape_data));
             return aasset;
         } else {
-            log::warn!("Custom cape texture not found, using original cape_invisible");
+            log::warn!("CAPE: Custom cape texture not found, using original cape_invisible");
             // Continue with original file
         }
+    }
+    
+    // 2. Player entity JSON modification
+    if is_player_entity_file(c_path) {
+        log::info!("CAPE: Intercepting player.entity.json: {}", c_path.display());
+        
+        // Read the original file first
+        if aasset.is_null() {
+            log::error!("CAPE: Failed to open original player.entity.json");
+            return aasset;
+        }
+        
+        let length = ndk_sys::AAsset_getLength(aasset) as usize;
+        if length == 0 {
+            log::error!("CAPE: player.entity.json has zero length");
+            return aasset;
+        }
+        
+        let mut original_data = vec![0u8; length];
+        let bytes_read = ndk_sys::AAsset_read(aasset, original_data.as_mut_ptr() as *mut libc::c_void, length);
+        
+        if bytes_read != length as i32 {
+            log::error!("CAPE: Failed to read original player.entity.json completely. Read {} bytes, expected {}", bytes_read, length);
+            return aasset;
+        }
+        
+        // Reset the asset position for normal operation
+        ndk_sys::AAsset_seek(aasset, 0, libc::SEEK_SET);
+        
+        if let Some(modified_data) = modify_player_entity_json(&original_data) {
+            let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+            wanted_lock.insert(AAssetPtr(aasset), Cursor::new(modified_data));
+            return aasset;
+        } else {
+            log::warn!("CAPE: Failed to modify player.entity.json, using original");
+            return aasset;
+        }
+    }
+    
+    // 3. Cape render controller file
+    if is_client_capes_render_controller_file(c_path) {
+        log::info!("CAPE: Intercepting cape render controller: {}", c_path.display());
+        let buffer = CAPE_RENDER_CONTROLLER_JSON.as_bytes().to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
     }
 
     // Block persona files if classic skins enabled
@@ -489,38 +612,6 @@ pub(crate) unsafe fn open(
             ndk_sys::AAsset_close(aasset);
         }
         return std::ptr::null_mut();
-    }
-    
-    // Client capes - modify player.entity.json
-    if is_player_entity_file(c_path) {
-        log::info!("Intercepting player.entity.json with client capes modification: {}", c_path.display());
-        
-        // Read the original file first
-        if aasset.is_null() {
-            log::error!("Failed to open original player.entity.json");
-            return aasset;
-        }
-        
-        let length = ndk_sys::AAsset_getLength(aasset) as usize;
-        let mut original_data = vec![0u8; length];
-        let bytes_read = ndk_sys::AAsset_read(aasset, original_data.as_mut_ptr() as *mut libc::c_void, length);
-        
-        if bytes_read != length as i32 {
-            log::error!("Failed to read original player.entity.json completely");
-            return aasset;
-        }
-        
-        // Reset the asset position for normal operation
-        ndk_sys::AAsset_seek(aasset, 0, libc::SEEK_SET);
-        
-        if let Some(modified_data) = modify_player_entity_json(&original_data) {
-            let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-            wanted_lock.insert(AAssetPtr(aasset), Cursor::new(modified_data));
-            return aasset;
-        } else {
-            log::warn!("Failed to modify player.entity.json, using original");
-            return aasset;
-        }
     }
     
     // Custom splashes
@@ -569,14 +660,6 @@ pub(crate) unsafe fn open(
     
     if is_classic_skins_json_file(c_path) {
         log::info!("Intercepting skins.json with classic skins content: {}", c_path.display());
-        let buffer = RENDER_JSON.as_bytes().to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-    
-    if is_client_capes_file(c_path) {
-        log::info!("Intercepting cape.render_controllers.json with cape content: {}", c_path.display());
         let buffer = CUSTOM_SKINS_JSON.as_bytes().to_vec();
         let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
@@ -934,4 +1017,3 @@ fn seek_facade(offset: i64, whence: libc::c_int, file: &mut Cursor<Vec<u8>>) -> 
             -1
         }
     }
-}

@@ -55,8 +55,7 @@ impl Default for ModConfig {
             cape_physics: false,
             night_vision: false,
             xelo_title: true,
-            client_capes: false,
-            // custom_field: false,
+            client_capes: false, 
         }
     }
 }
@@ -64,12 +63,24 @@ impl Default for ModConfig {
 // Global config instance
 static CONFIG: OnceLock<ModConfig> = OnceLock::new();
 
-// Config file path
-const CONFIG_DIR: &str = "/storage/emulated/0/Android/data/com.origin.launcher/files/origin_mods";
-const CONFIG_FILE: &str = "/storage/emulated/0/Android/data/com.origin.launcher/files/origin_mods/config.json";
+// Config file paths - try multiple locations
+const CONFIG_DIRS: &[&str] = &[
+    "/storage/emulated/0/Android/data/com.origin.launcher/files/origin_mods",
+    "/storage/emulated/0/Android/data/com.mojang.minecraftpe/files/origin_mods",
+    "/sdcard/Android/data/com.origin.launcher/files/origin_mods",
+    "/sdcard/origin_mods",
+];
+
+const CONFIG_FILES: &[&str] = &[
+    "/storage/emulated/0/Android/data/com.origin.launcher/files/origin_mods/config.json",
+    "/storage/emulated/0/Android/data/com.mojang.minecraftpe/files/origin_mods/config.json",
+    "/sdcard/Android/data/com.origin.launcher/files/origin_mods/config.json",
+    "/sdcard/origin_mods/config.json",
+];
 
 pub fn init_config() {
     let config = load_or_create_config();
+    log::info!("Config initialized - client_capes: {}", config.client_capes);
     CONFIG.set(config).expect("Failed to set config");
 }
 
@@ -78,38 +89,48 @@ pub fn get_config() -> &'static ModConfig {
 }
 
 fn load_or_create_config() -> ModConfig {
-    // Create directory if it doesn't exist
-    if let Err(e) = fs::create_dir_all(CONFIG_DIR) {
-        log::warn!("Failed to create config directory: {}", e);
-        return ModConfig::default();
+    // Try to create directories
+    for dir in CONFIG_DIRS {
+        if let Err(e) = fs::create_dir_all(dir) {
+            log::debug!("Failed to create config directory {}: {}", dir, e);
+        } else {
+            log::debug!("Created/verified config directory: {}", dir);
+        }
     }
 
-    // Try to load existing config
-    if Path::new(CONFIG_FILE).exists() {
-        match load_config() {
-            Ok(config) => {
-                log::info!("Loaded config from {}", CONFIG_FILE);
-                return config;
-            }
-            Err(e) => {
-                log::warn!("Failed to load config, using default: {}", e);
+    // Try to load existing config from any location
+    for config_file in CONFIG_FILES {
+        if Path::new(config_file).exists() {
+            match load_config(config_file) {
+                Ok(config) => {
+                    log::info!("Loaded config from {}", config_file);
+                    log::info!("Client capes enabled: {}", config.client_capes);
+                    return config;
+                }
+                Err(e) => {
+                    log::warn!("Failed to load config from {}: {}", config_file, e);
+                }
             }
         }
     }
 
-    // Create default config file
+    // Create default config file in the first available directory
     let default_config = ModConfig::default();
-    if let Err(e) = save_config(&default_config) {
-        log::warn!("Failed to save default config: {}", e);
-    } else {
-        log::info!("Created default config at {}", CONFIG_FILE);
+    for config_file in CONFIG_FILES {
+        if let Err(e) = save_config(&default_config, config_file) {
+            log::debug!("Failed to save default config to {}: {}", config_file, e);
+        } else {
+            log::info!("Created default config at {}", config_file);
+            break;
+        }
     }
 
+    log::info!("Using default config - client_capes: {}", default_config.client_capes);
     default_config
 }
 
-fn load_config() -> Result<ModConfig, Box<dyn std::error::Error>> {
-    let mut file = File::open(CONFIG_FILE)?;
+fn load_config(path: &str) -> Result<ModConfig, Box<dyn std::error::Error>> {
+    let mut file = File::open(path)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
     
@@ -117,9 +138,14 @@ fn load_config() -> Result<ModConfig, Box<dyn std::error::Error>> {
     Ok(config)
 }
 
-fn save_config(config: &ModConfig) -> Result<(), Box<dyn std::error::Error>> {
+fn save_config(config: &ModConfig, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    // Create parent directory if it doesn't exist
+    if let Some(parent) = Path::new(path).parent() {
+        fs::create_dir_all(parent)?;
+    }
+    
     let json = serde_json::to_string_pretty(config)?;
-    let mut file = File::create(CONFIG_FILE)?;
+    let mut file = File::create(path)?;
     file.write_all(json.as_bytes())?;
     file.sync_all()?;
     Ok(())
@@ -163,7 +189,9 @@ pub fn is_xelo_title_enabled() -> bool {
 }
 
 pub fn is_client_capes_enabled() -> bool {
-    get_config().client_capes
+    let enabled = get_config().client_capes;
+    log::debug!("is_client_capes_enabled() called: {}", enabled);
+    enabled
 }
 
 // You can add more helper functions for other config values
