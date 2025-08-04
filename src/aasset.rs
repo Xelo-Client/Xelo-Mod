@@ -569,7 +569,7 @@ pub(crate) unsafe fn open(
     
     if is_classic_skins_json_file(c_path) {
         log::info!("Intercepting skins.json with classic skins content: {}", c_path.display());
-        let buffer = RENDER_JSON.as_bytes().to_vec();
+        let buffer = CUSTOM_SKINS_JSON.as_bytes().to_vec();
         let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;
