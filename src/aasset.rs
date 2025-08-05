@@ -162,16 +162,17 @@ fn get_title_png_data(filename: &str) -> Option<&'static [u8]> {
     }
 }
 
-// Enhanced particles disabler - blocks entire particles folder and all particle-related files
 fn is_particles_folder_to_block(c_path: &Path) -> bool {
     if !is_particles_disabler_enabled() {
         return false;
     }
     
-    let path_str = c_path.to_string_lossy();
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
     
-    // Block any file related to particles
-    let particle_patterns = [
+    let particle_files = [
         "arrowspell.json",
         "balloon_gas.json",
         "basic_bubble.json",
@@ -289,9 +290,7 @@ fn is_particles_folder_to_block(c_path: &Path) -> bool {
         "wither_boss_invulnerable.json",
     ];
     
-    particle_patterns.iter().any(|pattern| {
-        path_str.contains(pattern)
-    }) || path_str.starts_with("particles") || path_str.ends_with(".particle") || path_str.ends_with("_particle.json")
+    particle_files.contains(&filename.as_ref())
 }
 
 // Enhanced cape_invisible texture detection with more patterns
@@ -409,9 +408,7 @@ fn is_client_capes_file(c_path: &Path) -> bool {
     
     // Check for cape render controller files
     let cape_render_files = [
-        "cape.render_controllers.json",
-        "player.cape.render_controllers.json",
-        "cape_render_controllers.json",
+        "cape.render_controllers.json"
     ];
     
     cape_render_files.contains(&filename.as_ref())
