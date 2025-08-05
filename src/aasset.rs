@@ -48,7 +48,24 @@ const CUSTOM_LOADING_MESSAGES_JSON: &str = r#"{"beginner_loading_messages":["Ori
 
 const CUSTOM_SKINS_JSON: &str = r#"{"skins":[{"localization_name":"Steve","geometry":"geometry.humanoid.custom","texture":"steve.png","type":"free"},{"localization_name":"Alex","geometry":"geometry.humanoid.customSlim","texture":"alex.png","type":"free"}],"serialize_name":"Standard","localization_name":"Standard"}"#;
 
-const RENDER_JSON: &str = r#"{"format_version":"1.8.0","render_controllers":{"controller.render.player.cape":{"rebuild_animation_matrices":true,"geometry":"Geometry.cape","materials":[{"*":"Material.cape"}],"textures":["Texture.cape"]}}}"#;
+// Fixed render controller JSON with proper format and indentation
+const RENDER_JSON: &str = r#"{
+    "format_version": "1.8.0",
+    "render_controllers": {
+        "controller.render.player.cape": {
+            "rebuild_animation_matrices": true,
+            "geometry": "Geometry.cape",
+            "materials": [
+                {
+                    "*": "Material.cape"
+                }
+            ],
+            "textures": [
+                "Texture.cape"
+            ]
+        }
+    }
+}"#;
 
 const CLASSIC_STEVE_TEXTURE: &[u8] = include_bytes!("s.png");
 const CLASSIC_ALEX_TEXTURE: &[u8] = include_bytes!("a.png");
@@ -176,12 +193,14 @@ fn is_particles_folder_to_block(c_path: &Path) -> bool {
     }) || path_str.starts_with("particles") || path_str.ends_with(".particle") || path_str.ends_with("_particle.json")
 }
 
+// Enhanced cape_invisible texture detection with more patterns
 fn is_cape_invisible_texture_file(c_path: &Path) -> bool {
     if !is_client_capes_enabled() {
         return false;
     }
     
     let path_str = c_path.to_string_lossy();
+    let filename = c_path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default();
     
     // Check for cape_invisible texture in various possible locations
     let cape_invisible_patterns = [
@@ -201,10 +220,16 @@ fn is_cape_invisible_texture_file(c_path: &Path) -> bool {
         "vanilla/textures/entity/cape_invisible",
     ];
     
+    // Also check if filename itself is cape_invisible.png
+    if filename == "cape_invisible.png" || filename == "cape_invisible" {
+        return true;
+    }
+    
     cape_invisible_patterns.iter().any(|pattern| {
         path_str.contains(pattern) || path_str.ends_with(pattern)
     })
 }
+
 // Enhanced clouds detection with more patterns
 fn is_clouds_texture_file(c_path: &Path) -> bool {
     if !is_java_clouds_enabled() {
@@ -270,12 +295,25 @@ fn is_classic_skins_json_file(c_path: &Path) -> bool {
     is_skin_file_path(c_path, "skins.json")
 }
 
+// Enhanced cape render controllers detection
 fn is_client_capes_file(c_path: &Path) -> bool {
     if !is_client_capes_enabled() {
         return false;
     }
     
-    is_skin_file_path(c_path, "cape.render_controllers.json")
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+    
+    // Check for cape render controller files
+    let cape_render_files = [
+        "cape.render_controllers.json",
+        "player.cape.render_controllers.json",
+        "cape_render_controllers.json",
+    ];
+    
+    cape_render_files.contains(&filename.as_ref())
 }
 
 fn is_persona_file_to_block(c_path: &Path) -> bool {
@@ -322,19 +360,24 @@ fn get_cape_animation_data(filename: &str) -> Option<&'static [u8]> {
     }
 }
 
-// Function to check if this is a player.entity.json file that needs client capes modification
+// Enhanced player.entity.json detection
 fn is_player_entity_file(c_path: &Path) -> bool {
     if !is_client_capes_enabled() {
         return false;
     }
     
     let path_str = c_path.to_string_lossy();
-    let os_filename = match c_path.file_name() {
+    let filename = match c_path.file_name() {
         Some(name) => name.to_string_lossy(),
         None => return false,
     };
     
-    // Check if it's player.entity.json in various possible locations
+    // Must be exactly player.entity.json
+    if filename != "player.entity.json" {
+        return false;
+    }
+    
+    // Check if it's in a valid entity location
     let player_entity_patterns = [
         "entity/player.entity.json",
         "/entity/player.entity.json",
@@ -343,27 +386,35 @@ fn is_player_entity_file(c_path: &Path) -> bool {
         "resource_packs/vanilla/entity/player.entity.json",
         "assets/resource_packs/vanilla/entity/player.entity.json",
         "vanilla/entity/player.entity.json",
+        "assets/entity/player.entity.json",
+        "assets/entities/player.entity.json",
     ];
     
-    os_filename == "player.entity.json" && player_entity_patterns.iter().any(|pattern| {
+    player_entity_patterns.iter().any(|pattern| {
         path_str.contains(pattern) || path_str.ends_with(pattern)
     })
 }
 
+// Improved custom cape texture loading with better error handling
 fn load_custom_cape_texture() -> Option<Vec<u8>> {
     match std::fs::read(CAPE_TEXTURE_PATH) {
         Ok(data) => {
-            log::info!("Successfully loaded custom cape texture from: {}", CAPE_TEXTURE_PATH);
+            if data.is_empty() {
+                log::warn!("Custom cape texture file is empty: {}", CAPE_TEXTURE_PATH);
+                return None;
+            }
+            log::info!("Successfully loaded custom cape texture from: {} ({} bytes)", CAPE_TEXTURE_PATH, data.len());
             Some(data)
         }
         Err(e) => {
             log::warn!("Failed to load custom cape texture from {}: {}", CAPE_TEXTURE_PATH, e);
-            log::info!("Make sure xelo_cape.png exists in the origin_mods folder");
+            log::info!("Make sure xelo_cape.png exists in the origin_mods folder and is a valid PNG file");
             None
         }
     }
 }
-// Function to modify player.entity.json to add cape render controller
+
+// Improved player.entity.json modification with better error handling
 fn modify_player_entity_json(original_data: &[u8]) -> Option<Vec<u8>> {
     let json_str = match std::str::from_utf8(original_data) {
         Ok(s) => s,
@@ -390,6 +441,7 @@ fn modify_player_entity_json(original_data: &[u8]) -> Option<Vec<u8>> {
             .get_mut("description")
             .and_then(|desc| desc.as_object_mut())
         {
+            // Get the existing render_controllers array
             if let Some(render_controllers) = description
                 .get_mut("render_controllers")
                 .and_then(|rc| rc.as_array_mut())
@@ -401,9 +453,11 @@ fn modify_player_entity_json(original_data: &[u8]) -> Option<Vec<u8>> {
                 
                 // Check if cape controller already exists
                 let cape_exists = render_controllers.iter().any(|controller| {
-                    controller.as_object()
-                        .map(|obj| obj.contains_key("controller.render.player.cape"))
-                        .unwrap_or(false)
+                    if let Some(obj) = controller.as_object() {
+                        obj.contains_key("controller.render.player.cape")
+                    } else {
+                        false
+                    }
                 });
                 
                 if !cape_exists {
@@ -416,6 +470,19 @@ fn modify_player_entity_json(original_data: &[u8]) -> Option<Vec<u8>> {
                 log::error!("render_controllers array not found in player.entity.json");
                 return None;
             }
+            
+            // Verify textures section has cape texture (should already exist in the default file)
+            if let Some(textures) = description.get("textures").and_then(|t| t.as_object()) {
+                if textures.contains_key("cape") {
+                    log::info!("Cape texture reference already exists in player.entity.json");
+                } else {
+                    log::warn!("Cape texture reference missing from player.entity.json");
+                }
+            } else {
+                log::error!("Textures section not found in player.entity.json");
+                return None;
+            }
+            
         } else {
             log::error!("description object not found in player.entity.json");
             return None;
@@ -425,7 +492,7 @@ fn modify_player_entity_json(original_data: &[u8]) -> Option<Vec<u8>> {
         return None;  
     }
     
-    // Convert back to JSON string
+    // Convert back to JSON string with proper formatting
     match serde_json::to_string_pretty(&json_value) {
         Ok(modified_json) => Some(modified_json.into_bytes()),
         Err(e) => {
@@ -451,8 +518,15 @@ pub(crate) unsafe fn open(
         return aasset;
     };
 
-    // Debug logging for features
+    // Debug logging for client capes
+    if is_client_capes_enabled() {
+        let path_str = c_path.to_string_lossy();
+        if path_str.contains("cape") || path_str.contains("player.entity") {
+            log::info!("Client capes enabled - checking file: {}", c_path.display());
+        }
+    }
     
+    // Debug logging for particles disabler
     if is_particles_disabler_enabled() {
         let path_str = c_path.to_string_lossy();
         if path_str.contains("particle") || path_str.contains("effect") {
@@ -460,6 +534,7 @@ pub(crate) unsafe fn open(
         }
     }
     
+    // Handle cape_invisible texture replacement
     if is_cape_invisible_texture_file(c_path) {
         log::info!("Intercepting cape_invisible texture with custom cape: {}", c_path.display());
         
@@ -468,8 +543,12 @@ pub(crate) unsafe fn open(
             wanted_lock.insert(AAssetPtr(aasset), Cursor::new(custom_cape_data));
             return aasset;
         } else {
-            log::warn!("Custom cape texture not found, using original cape_invisible");
-            // Continue with original file
+            log::warn!("Custom cape texture not found, blocking cape_invisible texture");
+            // Block the original cape_invisible texture if custom one isn't available
+            if !aasset.is_null() {
+                ndk_sys::AAsset_close(aasset);
+            }
+            return std::ptr::null_mut();
         }
     }
 
@@ -491,7 +570,7 @@ pub(crate) unsafe fn open(
         return std::ptr::null_mut();
     }
     
-    // Client capes - modify player.entity.json
+    // Handle player.entity.json modification
     if is_player_entity_file(c_path) {
         log::info!("Intercepting player.entity.json with client capes modification: {}", c_path.display());
         
@@ -502,11 +581,16 @@ pub(crate) unsafe fn open(
         }
         
         let length = ndk_sys::AAsset_getLength(aasset) as usize;
+        if length == 0 {
+            log::error!("player.entity.json has zero length");
+            return aasset;
+        }
+        
         let mut original_data = vec![0u8; length];
         let bytes_read = ndk_sys::AAsset_read(aasset, original_data.as_mut_ptr() as *mut libc::c_void, length);
         
         if bytes_read != length as i32 {
-            log::error!("Failed to read original player.entity.json completely");
+            log::error!("Failed to read original player.entity.json completely (read {}, expected {})", bytes_read, length);
             return aasset;
         }
         
@@ -575,8 +659,9 @@ pub(crate) unsafe fn open(
         return aasset;
     }
     
+    // Handle cape render controllers
     if is_client_capes_file(c_path) {
-        log::info!("Intercepting cape.render_controllers.json with cape content: {}", c_path.display());
+        log::info!("Intercepting cape render controller file with cape content: {}", c_path.display());
         let buffer = RENDER_JSON.as_bytes().to_vec();
         let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
