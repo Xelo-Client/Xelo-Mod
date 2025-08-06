@@ -38,6 +38,9 @@ pub struct ModConfig {
     
     #[serde(rename = "client_capes")]
     pub client_capes: bool,
+    
+    #[serde(rename = "white_block_outline")]
+    pub white_block_outline: bool,
     // You can add more fields as needed
     // #[serde(rename = "CustomField")]
     // pub custom_field: bool,
@@ -56,7 +59,7 @@ impl Default for ModConfig {
             night_vision: false,
             xelo_title: true,
             client_capes: false,
-            // custom_field: false,
+            white_block_outline: false,
         }
     }
 }
@@ -164,6 +167,10 @@ pub fn is_xelo_title_enabled() -> bool {
 
 pub fn is_client_capes_enabled() -> bool {
     get_config().client_capes
+}
+
+pub fn is_block_whiteoutline_enabled() -> bool {
+    get_config().white_block_outline
 }
 
 // You can add more helper functions for other config values
