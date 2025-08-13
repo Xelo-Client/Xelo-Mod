@@ -791,7 +791,42 @@ pub(crate) unsafe fn open(
             cxx::let_cxx_string!(cxx_out = "");
             let loadfn = match crate::RPM_LOAD.get() {
                 Some(ptr) => ptr,
-                // Empty JSON for disabled particles
+                None => {
+                    log::warn!("ResourcePackManager fn is not ready yet?");
+                    return aasset;
+                }
+            };
+            let mut arraybuf = [0; 128];
+            let file_path = opt_path_join(&mut arraybuf, &[Path::new(replacement.1), file]);
+            let packm_ptr = crate::PACKM_OBJ.load(std::sync::atomic::Ordering::Acquire);
+            let resource_loc = ResourceLocation::from_str(file_path.as_ref());
+            log::info!("loading rpck file: {:#?}", &file_path);
+            if packm_ptr.is_null() {
+                log::error!("ResourcePackManager ptr is null");
+                return aasset;
+            }
+            loadfn(packm_ptr, resource_loc, cxx_out.as_mut());
+            if cxx_out.is_empty() {
+                log::info!("File was not found");
+                return aasset;
+            }
+            let buffer = if os_filename.as_encoded_bytes().ends_with(b".material.bin") {
+                match process_material(man, cxx_out.as_bytes()) {
+                    Some(updated) => updated,
+                    None => cxx_out.as_bytes().to_vec(),
+                }
+            } else {
+                cxx_out.as_bytes().to_vec()
+            };
+            let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+            wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+            return aasset;
+        }
+    }
+    return aasset;
+}
+
+// Empty JSON for disabled particles
 const EMPTY_PARTICLE_JSON: &str = r#"{}"#;
 
 fn opt_path_join<'a>(bytes: &'a mut [u8; 128], paths: &[&Path]) -> Cow<'a, CStr> {
@@ -1011,40 +1046,7 @@ fn seek_facade(offset: i64, whence: libc::c_int, file: &mut Cursor<Vec<u8>>) -> 
             -1
         }
     }
-} => {
-                    log::warn!("ResourcePackManager fn is not ready yet?");
-                    return aasset;
-                }
-            };
-            let mut arraybuf = [0; 128];
-            let file_path = opt_path_join(&mut arraybuf, &[Path::new(replacement.1), file]);
-            let packm_ptr = crate::PACKM_OBJ.load(std::sync::atomic::Ordering::Acquire);
-            let resource_loc = ResourceLocation::from_str(file_path.as_ref());
-            log::info!("loading rpck file: {:#?}", &file_path);
-            if packm_ptr.is_null() {
-                log::error!("ResourcePackManager ptr is null");
-                return aasset;
-            }
-            loadfn(packm_ptr, resource_loc, cxx_out.as_mut());
-            if cxx_out.is_empty() {
-                log::info!("File was not found");
-                return aasset;
-            }
-            let buffer = if os_filename.as_encoded_bytes().ends_with(b".material.bin") {
-                match process_material(man, cxx_out.as_bytes()) {
-                    Some(updated) => updated,
-                    None => cxx_out.as_bytes().to_vec(),
-                }
-            } else {
-                cxx_out.as_bytes().to_vec()
-            };
-            let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-            wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-            return aasset;
-        }
-    }
-    return aasset;
-}"#;
+}
 
 const CLASSIC_STEVE_TEXTURE: &[u8] = include_bytes!("s.png");
 const CLASSIC_ALEX_TEXTURE: &[u8] = include_bytes!("a.png");
@@ -1054,7 +1056,24 @@ const JAVA_CLOUDS_TEXTURE: &[u8] = include_bytes!("Diskksks.png");
 fn get_current_mcver(man: ndk::asset::AssetManager) -> Option<MinecraftVersion> {
     let mut file = match get_uitext(man) {
         Some(asset) => asset,
-        // Enhanced player.entity.json detection
+        None => return None,
+    };
+    
+    let mut buffer = Vec::new();
+    if let Err(_) = file.read_to_end(&mut buffer) {
+        return None;
+    }
+    
+    // Try to parse the material file to determine version
+    for version in materialbin::ALL_VERSIONS {
+        if let Ok(_) = buffer.pread_with::<CompiledMaterialDefinition>(0, version) {
+            return Some(version);
+        }
+    }
+    
+    None
+}
+
 fn is_player_entity_file(c_path: &Path) -> bool {
     if !is_client_capes_enabled() {
         return false;
@@ -1217,9 +1236,11 @@ fn modify_player_entity_json(original_data: &[u8]) -> Option<Vec<u8>> {
 }
 
 fn get_uitext(man: ndk::asset::AssetManager) -> Option<Asset> {
-    const NEW: &CStr = c"assets/renderer/materials/UIText.material.bin";
-    const OLD: &CStr = c"renderer/materials/UIText.material.bin";
-    for path in [NEW, OLD] {
+    let paths = [
+        "assets/renderer/materials/UIText.material.bin",
+        "renderer/materials/UIText.material.bin",
+    ];
+    for path in paths {
         if let Some(asset) = man.open(path) {
             return Some(asset);
         }
