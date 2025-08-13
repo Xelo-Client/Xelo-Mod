@@ -33,385 +33,8 @@ const CAPE_TEXTURE_PATH: &str = "/storage/emulated/0/Android/data/com.origin.lau
 
 const TITLE_PNG: &[u8] = include_bytes!("minecraft_title_5.png");
 
-// New cape physics constants
-const CAPE_ANIMATION_JSON: &str = r#"{
-	"format_version": "1.8.0",
-	"animations": {
-		"animation.player.cape": {
-			"loop": true,
-			"bones": {
-				"cape": {
-					"rotation": ["math.clamp(math.lerp(0, -110, query.cape_flap_amount) - (13 * query.modified_move_speed), -70, 0)", "query.modified_move_speed * math.pow(math.sin(query.body_y_rotation - query.head_y_rotation(0)), 3) * 55", 0],
-					"position": [0, 0, "query.get_root_locator_offset('armor_offset.default_neck', 1)"]
-				},
-				"part1": {
-					"rotation": ["math.clamp(query.cape_flap_amount, 0, 0.5) * (math.cos(query.modified_distance_moved * 18) * 16)", 0, "0"]
-				},
-				"part2": {
-					"rotation": ["math.clamp(query.cape_flap_amount, 0, 0.5) * math.cos(22 - query.modified_distance_moved * 18) * 13", 0, 0],
-					"scale": 1
-				},
-				"part3": {
-					"rotation": ["math.clamp(query.cape_flap_amount, 0, 0.5) * math.cos(50 - query.modified_distance_moved * 18) * 13", 0, 0]
-				},
-				"part4": {
-					"rotation": ["math.clamp(query.cape_flap_amount, 0, 0.5) * math.cos(76 - query.modified_distance_moved * 18) * 13", 0, 0]
-				},
-				"part5": {
-					"rotation": ["math.clamp(query.cape_flap_amount, 0, 0.5) * math.cos(100 - query.modified_distance_moved * 18) * 13", 0, 0]
-				},
-				"part6": {
-					"rotation": ["math.clamp(query.cape_flap_amount, 0, 0.5) * math.cos(122 - query.modified_distance_moved * 18) * 13", 0, 0]
-				},
-				"part7": {
-					"rotation": ["math.clamp(query.cape_flap_amount, 0, 0.5) * math.cos(142 - query.modified_distance_moved * 18) * 13", 0, 0]
-				},
-				"part8": {
-					"rotation": ["math.clamp(query.cape_flap_amount, 0, 0.5) * math.cos(160 - query.modified_distance_moved * 18) * 13", 0, 0]
-				},
-				"part9": {
-					"rotation": ["math.clamp(query.cape_flap_amount, 0, 0.5) * math.cos(176 - query.modified_distance_moved * 18) * 13", 0, 0]
-				},
-				"part10": {
-					"rotation": ["math.clamp(query.cape_flap_amount, 0, 0.5) * math.cos(190 - query.modified_distance_moved * 18) * 13", 0, 0]
-				},
-				"part11": {
-					"rotation": ["math.clamp(query.cape_flap_amount, 0, 0.5) * math.cos(202 - query.modified_distance_moved * 18) * 13", 0, 0]
-				},
-				"part12": {
-					"rotation": ["math.clamp(query.cape_flap_amount, 0, 0.5) * math.cos(212 - query.modified_distance_moved * 18) * 13", 0, 0]
-				},
-				"part13": {
-					"rotation": ["math.clamp(query.cape_flap_amount, 0, 0.5) * math.cos(220 - query.modified_distance_moved * 18) * 13", 0, 0]
-				},
-				"part14": {
-					"rotation": ["math.clamp(query.cape_flap_amount, 0, 0.5) * math.cos(226 - query.modified_distance_moved * 18) * 13", 0, 0]
-				},
-				"part15": {
-					"rotation": ["math.clamp(query.cape_flap_amount, 0, 0.5) * math.cos(230 - query.modified_distance_moved * 18) * 13", 0, 0]
-				},
-				"part16": {
-					"rotation": ["math.clamp(query.cape_flap_amount, 0, 0.5) * math.cos(232 - query.modified_distance_moved * 18) * 13", 0, 0]
-				},
-				"shoulders": {
-					"rotation": [0, "query.modified_move_speed * math.pow(math.sin(query.body_y_rotation - query.head_y_rotation(0)), 3) * 60", 0]
-				}
-			}
-		}
-	}
-}"#;
-
-const CAPE_GEO_JSON: &str = r#"{
-	"format_version": "1.12.0",
-	"minecraft:geometry": [
-		{
-			"description": {
-				"identifier": "geometry.cape",
-				"texture_width": 64,
-				"texture_height": 32,
-				"visible_bounds_width": 2,
-				"visible_bounds_height": 3.5,
-				"visible_bounds_offset": [0, 1.25, 0]
-			},
-			"bones": [
-				{
-					"name": "root",
-					"pivot": [0, 0, 0]
-				},
-				{
-					"name": "waist",
-					"parent": "root",
-					"pivot": [0, 12, 0]
-				},
-				{
-					"name": "body",
-					"parent": "waist",
-					"pivot": [0, 24, 0]
-				},
-				{
-					"name": "cape",
-					"parent": "body",
-					"pivot": [0, 24, 2],
-					"rotation": [0, 180, 0]
-				},
-				{
-					"name": "part1",
-					"parent": "cape",
-					"pivot": [0, 24, 2],
-					"cubes": [
-						{
-							"origin": [-5, 23, 1],
-							"size": [10, 1, 1],
-							"uv": {
-								"north": {"uv": [1, 1], "uv_size": [10, 1]},
-								"east": {"uv": [0, 1], "uv_size": [1, 1]},
-								"south": {"uv": [12, 1], "uv_size": [10, 1]},
-								"west": {"uv": [11, 1], "uv_size": [1, 1]},
-								"up": {"uv": [1, 1], "uv_size": [10, -1]}
-							}
-						}
-					]
-				},
-				{
-					"name": "part2",
-					"parent": "part1",
-					"pivot": [0, 23, 1],
-					"cubes": [
-						{
-							"origin": [-5, 22, 1],
-							"size": [10, 1.5, 1],
-							"uv": {
-								"north": {"uv": [1, 1.5], "uv_size": [10, 1.5]},
-								"east": {"uv": [0, 1.5], "uv_size": [1, 1.5]},
-								"south": {"uv": [12, 1.5], "uv_size": [10, 1.5]},
-								"west": {"uv": [11, 1.5], "uv_size": [1, 1.5]}
-							}
-						}
-					]
-				},
-				{
-					"name": "part3",
-					"parent": "part2",
-					"pivot": [0, 22, 1],
-					"cubes": [
-						{
-							"origin": [-5, 21, 1],
-							"size": [10, 1.5, 1],
-							"uv": {
-								"north": {"uv": [1, 2.5], "uv_size": [10, 1.5]},
-								"east": {"uv": [0, 2.5], "uv_size": [1, 1.5]},
-								"south": {"uv": [12, 2.5], "uv_size": [10, 1.5]},
-								"west": {"uv": [11, 2.5], "uv_size": [1, 1.5]}
-							}
-						}
-					]
-				},
-				{
-					"name": "part4",
-					"parent": "part3",
-					"pivot": [0, 21, 1],
-					"cubes": [
-						{
-							"origin": [-5, 20, 1],
-							"size": [10, 1.5, 1],
-							"uv": {
-								"north": {"uv": [1, 3.5], "uv_size": [10, 1.5]},
-								"east": {"uv": [0, 3.5], "uv_size": [1, 1.5]},
-								"south": {"uv": [12, 3.5], "uv_size": [10, 1.5]},
-								"west": {"uv": [11, 3.5], "uv_size": [1, 1.5]}
-							}
-						}
-					]
-				},
-				{
-					"name": "part5",
-					"parent": "part4",
-					"pivot": [0, 20, 1],
-					"cubes": [
-						{
-							"origin": [-5, 19, 1],
-							"size": [10, 1.5, 1],
-							"uv": {
-								"north": {"uv": [1, 4.5], "uv_size": [10, 1.5]},
-								"east": {"uv": [0, 4.5], "uv_size": [1, 1.5]},
-								"south": {"uv": [12, 4.5], "uv_size": [10, 1.5]},
-								"west": {"uv": [11, 4.5], "uv_size": [1, 1.5]}
-							}
-						}
-					]
-				},
-				{
-					"name": "part6",
-					"parent": "part5",
-					"pivot": [0, 19, 1],
-					"cubes": [
-						{
-							"origin": [-5, 18, 1],
-							"size": [10, 1.5, 1],
-							"uv": {
-								"north": {"uv": [1, 5.5], "uv_size": [10, 1.5]},
-								"east": {"uv": [0, 5.5], "uv_size": [1, 1.5]},
-								"south": {"uv": [12, 5.5], "uv_size": [10, 1.5]},
-								"west": {"uv": [11, 5.5], "uv_size": [1, 1.5]}
-							}
-						}
-					]
-				},
-				{
-					"name": "part7",
-					"parent": "part6",
-					"pivot": [0, 18, 1],
-					"cubes": [
-						{
-							"origin": [-5, 17, 1],
-							"size": [10, 1.5, 1],
-							"uv": {
-								"north": {"uv": [1, 6.5], "uv_size": [10, 1.5]},
-								"east": {"uv": [0, 6.5], "uv_size": [1, 1.5]},
-								"south": {"uv": [12, 6.5], "uv_size": [10, 1.5]},
-								"west": {"uv": [11, 6.5], "uv_size": [1, 1.5]}
-							}
-						}
-					]
-				},
-				{
-					"name": "part8",
-					"parent": "part7",
-					"pivot": [0, 17, 1],
-					"cubes": [
-						{
-							"origin": [-5, 16, 1],
-							"size": [10, 1.5, 1],
-							"uv": {
-								"north": {"uv": [1, 7.5], "uv_size": [10, 1.5]},
-								"east": {"uv": [0, 7.5], "uv_size": [1, 1.5]},
-								"south": {"uv": [12, 7.5], "uv_size": [10, 1.5]},
-								"west": {"uv": [11, 7.5], "uv_size": [1, 1.5]}
-							}
-						}
-					]
-				},
-				{
-					"name": "part9",
-					"parent": "part8",
-					"pivot": [0, 16, 1],
-					"cubes": [
-						{
-							"origin": [-5, 15, 1],
-							"size": [10, 1.5, 1],
-							"uv": {
-								"north": {"uv": [1, 8.5], "uv_size": [10, 1.5]},
-								"east": {"uv": [0, 8.5], "uv_size": [1, 1.5]},
-								"south": {"uv": [12, 8.5], "uv_size": [10, 1.5]},
-								"west": {"uv": [11, 8.5], "uv_size": [1, 1.5]}
-							}
-						}
-					]
-				},
-				{
-					"name": "part10",
-					"parent": "part9",
-					"pivot": [0, 15, 1],
-					"cubes": [
-						{
-							"origin": [-5, 14, 1],
-							"size": [10, 1.5, 1],
-							"uv": {
-								"north": {"uv": [1, 9.5], "uv_size": [10, 1.5]},
-								"east": {"uv": [0, 9.5], "uv_size": [1, 1.5]},
-								"south": {"uv": [12, 9.5], "uv_size": [10, 1.5]},
-								"west": {"uv": [11, 9.5], "uv_size": [1, 1.5]}
-							}
-						}
-					]
-				},
-				{
-					"name": "part11",
-					"parent": "part10",
-					"pivot": [0, 14, 1],
-					"cubes": [
-						{
-							"origin": [-5, 13, 1],
-							"size": [10, 1.5, 1],
-							"uv": {
-								"north": {"uv": [1, 10.5], "uv_size": [10, 1.5]},
-								"east": {"uv": [0, 10.5], "uv_size": [1, 1.5]},
-								"south": {"uv": [12, 10.5], "uv_size": [10, 1.5]},
-								"west": {"uv": [11, 10.5], "uv_size": [1, 1.5]}
-							}
-						}
-					]
-				},
-				{
-					"name": "part12",
-					"parent": "part11",
-					"pivot": [0, 13, 1],
-					"cubes": [
-						{
-							"origin": [-5, 12, 1],
-							"size": [10, 1.5, 1],
-							"uv": {
-								"north": {"uv": [1, 11.5], "uv_size": [10, 1.5]},
-								"east": {"uv": [0, 11.5], "uv_size": [1, 1.5]},
-								"south": {"uv": [12, 11.5], "uv_size": [10, 1.5]},
-								"west": {"uv": [11, 11.5], "uv_size": [1, 1.5]}
-							}
-						}
-					]
-				},
-				{
-					"name": "part13",
-					"parent": "part12",
-					"pivot": [0, 12, 1],
-					"cubes": [
-						{
-							"origin": [-5, 11, 1],
-							"size": [10, 1.5, 1],
-							"uv": {
-								"north": {"uv": [1, 12.5], "uv_size": [10, 1.5]},
-								"east": {"uv": [0, 12.5], "uv_size": [1, 1.5]},
-								"south": {"uv": [12, 12.5], "uv_size": [10, 1.5]},
-								"west": {"uv": [11, 12.5], "uv_size": [1, 1.5]}
-							}
-						}
-					]
-				},
-				{
-					"name": "part14",
-					"parent": "part13",
-					"pivot": [0, 11, 1],
-					"cubes": [
-						{
-							"origin": [-5, 10, 1],
-							"size": [10, 1.5, 1],
-							"uv": {
-								"north": {"uv": [1, 13.5], "uv_size": [10, 1.5]},
-								"east": {"uv": [0, 13.5], "uv_size": [1, 1.5]},
-								"south": {"uv": [12, 13.5], "uv_size": [10, 1.5]},
-								"west": {"uv": [11, 13.5], "uv_size": [1, 1.5]}
-							}
-						}
-					]
-				},
-				{
-					"name": "part15",
-					"parent": "part14",
-					"pivot": [0, 10, 1],
-					"cubes": [
-						{
-							"origin": [-5, 9, 1],
-							"size": [10, 1.5, 1],
-							"uv": {
-								"north": {"uv": [1, 14.5], "uv_size": [10, 1.5]},
-								"east": {"uv": [0, 14.5], "uv_size": [1, 1.5]},
-								"south": {"uv": [12, 14.5], "uv_size": [10, 1.5]},
-								"west": {"uv": [11, 14.5], "uv_size": [1, 1.5]}
-							}
-						}
-					]
-				},
-				{
-					"name": "part16",
-					"parent": "part15",
-					"pivot": [0, 9, 1],
-					"cubes": [
-						{
-							"origin": [-5, 8, 1],
-							"size": [10, 1.5, 1],
-							"uv": {
-								"north": {"uv": [1, 15.5], "uv_size": [10, 1.5]},
-								"east": {"uv": [0, 15.5], "uv_size": [1, 1.5]},
-								"south": {"uv": [12, 15.5], "uv_size": [10, 1.5]},
-								"west": {"uv": [11, 15.5], "uv_size": [1, 1.5]},
-								"down": {"uv": [11, 1], "uv_size": [10, -1]}
-							}
-						}
-					]
-				}
-			]
-		}
-	]
-}"#;
+const MOBS_JSON: &[u8] = include_bytes!("cape_physics/mobs.json");
+const PLAYER_ANIMATION_JSON: &[u8] = include_bytes!("cape_physics/player.animation.json");
 
 const RENDER_CHUNK_NV_MATERIAL_BIN: &[u8] = include_bytes!("nightvision_materials/RenderChunk.material.bin");
 
@@ -446,6 +69,557 @@ const RENDER_JSON: &str = r#"{
     }
 }"#;
 
+const CLASSIC_STEVE_TEXTURE: &[u8] = include_bytes!("s.png");
+const CLASSIC_ALEX_TEXTURE: &[u8] = include_bytes!("a.png");
+
+const JAVA_CLOUDS_TEXTURE: &[u8] = include_bytes!("Diskksks.png");
+
+fn get_current_mcver(man: ndk::asset::AssetManager) -> Option<MinecraftVersion> {
+    let mut file = match get_uitext(man) {
+        Some(asset) => asset,
+        None => {
+            log::error!("Shader fixing is disabled as no mc version was found");
+            return None;
+        }
+    };
+    let mut buf = Vec::with_capacity(file.length());
+    if let Err(e) = file.read_to_end(&mut buf) {
+        log::error!("Something is wrong with AssetManager, mc detection failed: {e}");
+        return None;
+    };
+    for version in materialbin::ALL_VERSIONS {
+        if buf
+            .pread_with::<CompiledMaterialDefinition>(0, version)
+            .is_ok()
+        {
+            log::info!("Mc version is {version}");
+            return Some(version);
+        };
+    }
+    None
+}
+
+fn get_uitext(man: ndk::asset::AssetManager) -> Option<Asset> {
+    const NEW: &CStr = c"assets/renderer/materials/UIText.material.bin";
+    const OLD: &CStr = c"renderer/materials/UIText.material.bin";
+    for path in [NEW, OLD] {
+        if let Some(asset) = man.open(path) {
+            return Some(asset);
+        }
+    }
+    None
+}
+
+macro_rules! folder_list {
+    ($( apk: $apk_folder:literal -> pack: $pack_folder:expr),
+        *,
+    ) => {
+        [
+            $(($apk_folder, $pack_folder)),*,
+        ]
+    }
+}
+
+fn get_no_fog_material_data(filename: &str) -> Option<&'static [u8]> {
+    if !is_no_fog_enabled() {
+        return None;
+    }
+    
+    match filename {
+        "RenderChunk.material.bin" => Some(RENDER_CHUNK_MATERIAL_BIN),
+        _ => None,
+    }
+}
+
+fn get_nightvision_material_data(filename: &str) -> Option<&'static [u8]> {
+    if !is_night_vision_enabled() {
+        return None;
+    }
+    
+    match filename {
+        "RenderChunk.material.bin" => Some(RENDER_CHUNK_NV_MATERIAL_BIN),
+        _ => None,
+    }
+}
+
+fn get_java_cubemap_material_data(filename: &str) -> Option<&'static [u8]> {
+    if !is_java_cubemap_enabled() {
+        return None;
+    }
+    
+    match filename {
+        "LegacyCubemap.material.bin" => Some(LEGACY_CUBEMAP_MATERIAL_BIN),
+        _ => None,
+    }
+}
+
+fn get_title_png_data(filename: &str) -> Option<&'static [u8]> {
+    if !is_xelo_title_enabled() {
+        return None;
+    }
+    
+    match filename {
+        "title.png" => Some(TITLE_PNG),
+        _ => None,
+    }
+}
+
+fn is_particles_folder_to_block(c_path: &Path) -> bool {
+    if !is_particles_disabler_enabled() {
+        return false;
+    }
+    
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+    
+    let particle_files = [
+        "arrowspell.json",
+        "balloon_gas.json",
+        "basic_bubble.json",
+        "basic_bubble_manual.json",
+        "basic_crit.json",
+        "basic_flame.json",
+        "basic_portal.json",
+        "basic_smoke.json",
+        "bleach.json",
+        "block_destruct.json",
+        "breaking_item_icon.json",
+        "breaking_item_terrain.json",
+        "bubble_column_bubble.json",
+        "bubble_column_down.json",
+        "bubble_column_up.json",
+        "camera_shoot_explosion.json",
+        "campfire_smoke.json",
+        "campfire_smoke_tall.json",
+        "cauldron_bubble.json",
+        "cauldron_splash.json",
+        "cauldronspell.json",
+        "colored_flame.json",
+        "conduit.json",
+        "conduit_absorb.json",
+        "conduit_attack.json",
+        "critical_hit.json",
+        "dolphin_move.json",
+        "dragon_breath_fire.json",
+        "dragon_breath_lingering.json",
+        "dragon_breath_trail.json",
+        "dragon_death_explosion.json",
+        "dragon_destroy_block.json",
+        "dragon_dying_explosion.json",
+        "enchanting_table_particle.json",
+        "end_chest.json",
+        "endrod.json",
+        "evaporation_elephant_toothpaste.json",
+        "evocation_fang.json",
+        "evoker_spell.json",
+        "explosion_cauldron.json",
+        "explosion_death.json",
+        "explosion_egg_destroy.json",
+        "explosion_eyeofender_death.json",
+        "explosion_labtable_fire.json",
+        "explosion_level.json",
+        "explosion_manual.json",
+        "eye_of_ender_bubble.json",
+        "falling_border_dust.json",
+        "falling_dust.json",
+        "falling_dust_concrete_powder.json",
+        "falling_dust_dragon_egg.json",
+        "falling_dust_gravel.json",
+        "falling_dust_red_sand.json",
+        "falling_dust_sand.json",
+        "falling_dust_scaffolding.json",
+        "falling_dust_top_snow.json",
+        "fish_hook.json",
+        "fish_pos.json",
+        "guardian_attack.json",
+        "guardian_water_move.json",
+        "heart.json",
+        "huge_explosion_lab_misc.json",
+        "huge_explosion_level.json",
+        "ice_evaporation.json",
+        "ink.json",
+        "knockback_roar.json",
+        "lab_table_heatblock_dust.json",
+        "lab_table_misc_mystical.json",
+        "large_explosion_level.json",
+        "lava_drip.json",
+        "lava_particle.json",
+        "llama_spit.json",
+        "magnesium_salts.json",
+        "mob_block_spawn.json",
+        "mob_portal.json",
+        "mobflame.json",
+        "mobflame_single.json",
+        "mobspell.json",
+        "mycelium_dust.json",
+        "note.json",
+        "obsidian_glow_dust.json",
+        "phantom_trail.json",
+        "portal_directional.json",
+        "portal_east_west.json",
+        "portal_north_south.json",
+        "rain_splash.json",
+        "redstone_ore_dust.json",
+        "redstone_repeater_dust.json",
+        "redstone_torch_dust.json",
+        "redstone_wire_dust.json",
+        "rising_border_dust.json",
+        "shulker_bullet.json",
+        "silverfish_grief.json",
+        "sneeze.json",
+        "sparkler.json",
+        "splashpotionspell.json",
+        "sponge_absorb_bubble.json",
+        "squid_flee.json",
+        "squid_ink_bubble.json",
+        "squid_move.json",
+        "stunned.json",
+        "totem.json",
+        "totem_manual.json",
+        "underwater_torch_bubble.json",
+        "villager_angry.json",
+        "villager_happy.json",
+        "water_drip.json",
+        "water_evaporation_actor.json",
+        "water_evaporation_bucket.json",
+        "water_evaporation_manual.json",
+        "water_splash.json",
+        "water_splash_manual.json",
+        "water_wake.json",
+        "witchspell.json",
+        "wither_boss_invulnerable.json",
+    ];
+    
+    particle_files.contains(&filename.as_ref())
+}
+
+// Enhanced cape_invisible texture detection with more patterns
+fn is_cape_invisible_texture_file(c_path: &Path) -> bool {
+    if !is_client_capes_enabled() {
+        return false;
+    }
+    
+    let path_str = c_path.to_string_lossy();
+    let filename = c_path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default();
+    
+    // Check for cape_invisible texture in various possible locations
+    let cape_invisible_patterns = [
+        "textures/entity/cape_invisible.png",
+        "/textures/entity/cape_invisible.png",
+        "textures/entity/cape_invisible",
+        "/textures/entity/cape_invisible",
+        "entity/cape_invisible.png",
+        "/entity/cape_invisible.png",
+        "entity/cape_invisible",
+        "/entity/cape_invisible",
+        "resource_packs/vanilla/textures/entity/cape_invisible.png",
+        "assets/resource_packs/vanilla/textures/entity/cape_invisible.png",
+        "vanilla/textures/entity/cape_invisible.png",
+        "resource_packs/vanilla/textures/entity/cape_invisible",
+        "assets/resource_packs/vanilla/textures/entity/cape_invisible",
+        "vanilla/textures/entity/cape_invisible",
+    ];
+    
+    // Also check if filename itself is cape_invisible.png
+    if filename == "cape_invisible.png" || filename == "cape_invisible" {
+        return true;
+    }
+    
+    cape_invisible_patterns.iter().any(|pattern| {
+        path_str.contains(pattern) || path_str.ends_with(pattern)
+    })
+}
+
+// Enhanced clouds detection with more patterns
+fn is_clouds_texture_file(c_path: &Path) -> bool {
+    if !is_java_clouds_enabled() {
+        return false;
+    }
+    
+    let path_str = c_path.to_string_lossy();
+    
+    let cloud_patterns = [
+        "textures/environment/clouds.png",
+        "/textures/environment/clouds.png",
+        "environment/clouds.png",
+        "/environment/clouds.png",
+        "clouds.png",
+        "textures/clouds.png",
+        "/textures/clouds.png",
+        "resource_packs/vanilla/textures/environment/clouds.png",
+        "assets/resource_packs/vanilla/textures/environment/clouds.png",
+        "vanilla/textures/environment/clouds.png",
+    ];
+    
+    cloud_patterns.iter().any(|pattern| {
+        path_str.contains(pattern) || path_str.ends_with(pattern)
+    })
+}
+
+fn is_skin_file_path(c_path: &Path, filename: &str) -> bool {
+    let path_str = c_path.to_string_lossy();
+    
+    let possible_paths = [
+        format!("vanilla/{}", filename),
+        format!("skin_packs/vanilla/{}", filename),
+        format!("resource_packs/vanilla/{}", filename),
+        format!("assets/skin_packs/vanilla/{}", filename),
+    ];
+    
+    possible_paths.iter().any(|path| {
+        path_str.contains(path) || path_str.ends_with(path)
+    })
+}
+
+fn is_classic_skins_steve_texture_file(c_path: &Path) -> bool {
+    if !is_classic_skins_enabled() {
+        return false;
+    }
+    
+    is_skin_file_path(c_path, "steve.png")
+}
+
+fn is_classic_skins_alex_texture_file(c_path: &Path) -> bool {
+    if !is_classic_skins_enabled() {
+        return false;
+    }
+    
+    is_skin_file_path(c_path, "alex.png")
+}
+
+fn is_classic_skins_json_file(c_path: &Path) -> bool {
+    if !is_classic_skins_enabled() {
+        return false;
+    }
+    
+    is_skin_file_path(c_path, "skins.json")
+}
+
+// Enhanced cape render controllers detection
+fn is_client_capes_file(c_path: &Path) -> bool {
+    if !is_client_capes_enabled() {
+        return false;
+    }
+    
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+    
+    // Check for cape render controller files
+    let cape_render_files = [
+        "cape.render_controllers.json"
+    ];
+    
+    cape_render_files.contains(&filename.as_ref())
+}
+
+fn is_outline_material_file(c_path: &Path) -> bool {
+    if !is_block_whiteoutline_enabled() {
+        return false;
+    }
+    
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+    
+    // Check for cape render controller files
+    let outline_material_files = [
+        "ui3D.material"
+    ];
+    
+    outline_material_files.contains(&filename.as_ref())
+}
+
+fn is_persona_file_to_block(c_path: &Path) -> bool {
+    if !is_classic_skins_enabled() {
+        return false;
+    }
+    
+    let path_str = c_path.to_string_lossy();
+    
+    let blocked_personas = [
+        "persona/08_Kai_Dcast.json",
+        "persona/07_Zuri_Dcast.json", 
+        "persona/06_Efe_Dcast.json",
+        "persona/05_Makena_Dcast.json",
+        "persona/04_Sunny_Dcast.json",
+        "persona/03_Ari_Dcast.json",
+        "persona/02_ Noor_Dcast.json", 
+    ];
+    
+    blocked_personas.iter().any(|persona_path| {
+        path_str.contains(persona_path) || path_str.ends_with(persona_path)
+    })
+}
+
+fn get_cape_model_data(filename: &str) -> Option<&'static [u8]> {
+    if !is_cape_physics_enabled() {
+        return None;
+    }
+    
+    match filename {
+        "mobs.json" => Some(MOBS_JSON),
+        _ => None,
+    }
+}
+
+fn get_cape_animation_data(filename: &str) -> Option<&'static [u8]> {
+    if !is_cape_physics_enabled() {
+        return None;
+    }
+    
+    match filename {
+        "player.animation.json" => Some(PLAYER_ANIMATION_JSON),
+        _ => None,
+    }
+}
+
+// Enhanced player.entity.json detection
+fn is_player_entity_file(c_path: &Path) -> bool {
+    if !is_client_capes_enabled() {
+        return false;
+    }
+    
+    let path_str = c_path.to_string_lossy();
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+    
+    // Must be exactly player.entity.json
+    if filename != "player.entity.json" {
+        return false;
+    }
+    
+    // Check if it's in a valid entity location
+    let player_entity_patterns = [
+        "entity/player.entity.json",
+        "/entity/player.entity.json",
+        "entities/player.entity.json", 
+        "/entities/player.entity.json",
+        "resource_packs/vanilla/entity/player.entity.json",
+        "assets/resource_packs/vanilla/entity/player.entity.json",
+        "vanilla/entity/player.entity.json",
+        "assets/entity/player.entity.json",
+        "assets/entities/player.entity.json",
+    ];
+    
+    player_entity_patterns.iter().any(|pattern| {
+        path_str.contains(pattern) || path_str.ends_with(pattern)
+    })
+}
+
+// Improved custom cape texture loading with better error handling
+fn load_custom_cape_texture() -> Option<Vec<u8>> {
+    match std::fs::read(CAPE_TEXTURE_PATH) {
+        Ok(data) => {
+            if data.is_empty() {
+                log::warn!("Custom cape texture file is empty: {}", CAPE_TEXTURE_PATH);
+                return None;
+            }
+            log::info!("Successfully loaded custom cape texture from: {} ({} bytes)", CAPE_TEXTURE_PATH, data.len());
+            Some(data)
+        }
+        Err(e) => {
+            log::warn!("Failed to load custom cape texture from {}: {}", CAPE_TEXTURE_PATH, e);
+            log::info!("Make sure xelo_cape.png exists in the origin_mods folder and is a valid PNG file");
+            None
+        }
+    }
+}
+
+// Improved player.entity.json modification with better error handling
+fn modify_player_entity_json(original_data: &[u8]) -> Option<Vec<u8>> {
+    let json_str = match std::str::from_utf8(original_data) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("Failed to parse player.entity.json as UTF-8: {}", e);
+            return None;
+        }
+    };
+    
+    let mut json_value: Value = match serde_json::from_str(json_str) {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Failed to parse player.entity.json as JSON: {}", e);
+            return None;
+        }
+    };
+    
+    // Navigate to the render_controllers array
+    if let Some(client_entity) = json_value
+        .get_mut("minecraft:client_entity")
+        .and_then(|ce| ce.as_object_mut())
+    {
+        if let Some(description) = client_entity
+            .get_mut("description")
+            .and_then(|desc| desc.as_object_mut())
+        {
+            // Get the existing render_controllers array
+            if let Some(render_controllers) = description
+                .get_mut("render_controllers")
+                .and_then(|rc| rc.as_array_mut())
+            {
+                // Create the cape render controller object
+                let cape_controller = serde_json::json!({
+                    "controller.render.player.cape": "(query.armor_texture_slot(1) != 5) && (!variable.is_first_person || variable.is_paperdoll) && (!variable.map_face_icon)"
+                });
+                
+                // Check if cape controller already exists
+                let cape_exists = render_controllers.iter().any(|controller| {
+                    if let Some(obj) = controller.as_object() {
+                        obj.contains_key("controller.render.player.cape")
+                    } else {
+                        false
+                    }
+                });
+                
+                if !cape_exists {
+                    render_controllers.push(cape_controller);
+                    log::info!("Added cape render controller to player.entity.json");
+                } else {
+                    log::info!("Cape render controller already exists in player.entity.json");
+                }
+            } else {
+                log::error!("render_controllers array not found in player.entity.json");
+                return None;
+            }
+            
+            // Verify textures section has cape texture (should already exist in the default file)
+            if let Some(textures) = description.get("textures").and_then(|t| t.as_object()) {
+                if textures.contains_key("cape") {
+                    log::info!("Cape texture reference already exists in player.entity.json");
+                } else {
+                    log::warn!("Cape texture reference missing from player.entity.json");
+                }
+            } else {
+                log::error!("Textures section not found in player.entity.json");
+                return None;
+            }
+            
+        } else {
+            log::error!("description object not found in player.entity.json");
+            return None;
+        }
+    } else {
+        log::error!("minecraft:client_entity not found in player.entity.json");
+        return None;  
+    }
+    
+    // Convert back to JSON string with proper formatting
+    match serde_json::to_string_pretty(&json_value) {
+        Ok(modified_json) => Some(modified_json.into_bytes()),
+        Err(e) => {
+            log::error!("Failed to serialize modified player.entity.json: {}", e);
+            None
+        }
+    }
+}
+
 pub(crate) unsafe fn open(
     man: *mut AAssetManager,
     fname: *const libc::c_char,
@@ -477,15 +651,6 @@ pub(crate) unsafe fn open(
             log::info!("Particles disabler enabled - checking file: {}", c_path.display());
         }
     }
-
-    // Handle particles disabling - replace with empty JSON instead of blocking
-    if is_particles_file_to_replace(c_path) {
-        log::info!("Replacing particles file with empty JSON due to particles_disabler enabled: {}", c_path.display());
-        let buffer = EMPTY_PARTICLE_JSON.as_bytes().to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
     
     // Handle cape_invisible texture replacement
     if is_cape_invisible_texture_file(c_path) {
@@ -514,96 +679,13 @@ pub(crate) unsafe fn open(
         return std::ptr::null_mut();
     }
 
-    // Handle cape physics - cape.animation.json creation
-    if is_cape_animation_file(c_path) {
-        log::info!("Intercepting cape.animation.json with cape animation content: {}", c_path.display());
-        let buffer = CAPE_ANIMATION_JSON.as_bytes().to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-
-    // Handle cape physics - cape.geo.json creation  
-    if is_cape_geo_file(c_path) {
-        log::info!("Intercepting cape.geo.json with cape geometry content: {}", c_path.display());
-        let buffer = CAPE_GEO_JSON.as_bytes().to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-
-    // Handle cape physics - mobs.json modification
-    if is_mobs_json_file(c_path) {
-        log::info!("Intercepting mobs.json to remove cape geometry: {}", c_path.display());
-        
-        // Read the original file first
-        if aasset.is_null() {
-            log::error!("Failed to open original mobs.json");
-            return aasset;
+    // Block entire particles folder if particles disabler enabled
+    if is_particles_folder_to_block(c_path) {
+        log::info!("Blocking particles file due to particles_disabler enabled: {}", c_path.display());
+        if !aasset.is_null() {
+            ndk_sys::AAsset_close(aasset);
         }
-        
-        let length = ndk_sys::AAsset_getLength(aasset) as usize;
-        if length == 0 {
-            log::error!("mobs.json has zero length");
-            return aasset;
-        }
-        
-        let mut original_data = vec![0u8; length];
-        let bytes_read = ndk_sys::AAsset_read(aasset, original_data.as_mut_ptr() as *mut libc::c_void, length);
-        
-        if bytes_read != length as i32 {
-            log::error!("Failed to read original mobs.json completely (read {}, expected {})", bytes_read, length);
-            return aasset;
-        }
-        
-        // Reset the asset position for normal operation
-        ndk_sys::AAsset_seek(aasset, 0, libc::SEEK_SET);
-        
-        if let Some(modified_data) = modify_mobs_json_remove_cape(&original_data) {
-            let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-            wanted_lock.insert(AAssetPtr(aasset), Cursor::new(modified_data));
-            return aasset;
-        } else {
-            log::warn!("Failed to modify mobs.json, using original");
-            return aasset;
-        }
-    }
-    
-    // Handle cape physics - vanilla/contents.json modification
-    if is_vanilla_contents_file(c_path) {
-        log::info!("Intercepting vanilla/contents.json to add cape files: {}", c_path.display());
-        
-        // Read the original file first
-        if aasset.is_null() {
-            log::error!("Failed to open original contents.json");
-            return aasset;
-        }
-        
-        let length = ndk_sys::AAsset_getLength(aasset) as usize;
-        if length == 0 {
-            log::error!("contents.json has zero length");
-            return aasset;
-        }
-        
-        let mut original_data = vec![0u8; length];
-        let bytes_read = ndk_sys::AAsset_read(aasset, original_data.as_mut_ptr() as *mut libc::c_void, length);
-        
-        if bytes_read != length as i32 {
-            log::error!("Failed to read original contents.json completely (read {}, expected {})", bytes_read, length);
-            return aasset;
-        }
-        
-        // Reset the asset position for normal operation
-        ndk_sys::AAsset_seek(aasset, 0, libc::SEEK_SET);
-        
-        if let Some(modified_data) = modify_vanilla_contents_json(&original_data) {
-            let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-            wanted_lock.insert(AAssetPtr(aasset), Cursor::new(modified_data));
-            return aasset;
-        } else {
-            log::warn!("Failed to modify contents.json, using original");
-            return aasset;
-        }
+        return std::ptr::null_mut();
     }
     
     // Handle player.entity.json modification
@@ -705,7 +787,7 @@ pub(crate) unsafe fn open(
     }
     
     if is_outline_material_file(c_path) {
-        log::info!("Intercepting ui3dmaterial file with new content: {}", c_path.display());
+        log::info!("Intercepting  ui3dmaterial file with new content: {}", c_path.display());
         let buffer = CUSTOM_BLOCKOUTLINE.as_bytes().to_vec();
         let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
@@ -756,6 +838,22 @@ pub(crate) unsafe fn open(
     if let Some(night_vision_data) = get_nightvision_material_data(&filename_str) {
         log::info!("Intercepting {} with night-vision material (night-vision enabled)", filename_str);
         let buffer = night_vision_data.to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+    
+    if let Some(cape_physics_animation_data) = get_cape_animation_data(&filename_str) {
+        log::info!("Intercepting {} with cape-physics animation (cape-physics enabled)", filename_str);
+        let buffer = cape_physics_animation_data.to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+    
+    if let Some(cape_physics_model_data) = get_cape_model_data(&filename_str) {
+        log::info!("Intercepting {} with cape-physics model (cape-physics enabled)", filename_str);
+        let buffer = cape_physics_model_data.to_vec();
         let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;
@@ -829,9 +927,6 @@ pub(crate) unsafe fn open(
     }
     return aasset;
 }
-
-// Empty JSON for disabled particles
-const EMPTY_PARTICLE_JSON: &str = r#"{}"#;
 
 fn opt_path_join<'a>(bytes: &'a mut [u8; 128], paths: &[&Path]) -> Cow<'a, CStr> {
     let total_len: usize = paths.iter().map(|p| p.as_os_str().len()).sum();
@@ -1048,786 +1143,6 @@ fn seek_facade(offset: i64, whence: libc::c_int, file: &mut Cursor<Vec<u8>>) -> 
         Err(err) => {
             log::error!("aasset seek failed: {err}");
             -1
-        }
-    }
-}
-
-const CLASSIC_STEVE_TEXTURE: &[u8] = include_bytes!("s.png");
-const CLASSIC_ALEX_TEXTURE: &[u8] = include_bytes!("a.png");
-
-const JAVA_CLOUDS_TEXTURE: &[u8] = include_bytes!("Diskksks.png");
-
-fn get_current_mcver(man: ndk::asset::AssetManager) -> Option<MinecraftVersion> {
-    let mut file = match get_uitext(man) {
-        Some(asset) => asset,
-        None => return None,
-    };
-    
-    let mut buffer = Vec::new();
-    if let Err(_) = file.read_to_end(&mut buffer) {
-        return None;
-    }
-    
-    // Try to parse the material file to determine version
-    for version in materialbin::ALL_VERSIONS {
-        if let Ok(_) = buffer.pread_with::<CompiledMaterialDefinition>(0, version) {
-            return Some(version);
-        }
-    }
-    
-    None
-}
-
-fn is_player_entity_file(c_path: &Path) -> bool {
-    if !is_client_capes_enabled() {
-        return false;
-    }
-    
-    let path_str = c_path.to_string_lossy();
-    let filename = match c_path.file_name() {
-        Some(name) => name.to_string_lossy(),
-        None => return false,
-    };
-    
-    // Must be exactly player.entity.json
-    if filename != "player.entity.json" {
-        return false;
-    }
-    
-    // Check if it's in a valid entity location
-    let player_entity_patterns = [
-        "entity/player.entity.json",
-        "/entity/player.entity.json",
-        "entities/player.entity.json", 
-        "/entities/player.entity.json",
-        "resource_packs/vanilla/entity/player.entity.json",
-        "assets/resource_packs/vanilla/entity/player.entity.json",
-        "vanilla/entity/player.entity.json",
-        "assets/entity/player.entity.json",
-        "assets/entities/player.entity.json",
-    ];
-    
-    player_entity_patterns.iter().any(|pattern| {
-        path_str.contains(pattern) || path_str.ends_with(pattern)
-    })
-}
-
-// Improved custom cape texture loading with better error handling
-fn load_custom_cape_texture() -> Option<Vec<u8>> {
-    match std::fs::read(CAPE_TEXTURE_PATH) {
-        Ok(data) => {
-            if data.is_empty() {
-                log::warn!("Custom cape texture file is empty: {}", CAPE_TEXTURE_PATH);
-                return None;
-            }
-            log::info!("Successfully loaded custom cape texture from: {} ({} bytes)", CAPE_TEXTURE_PATH, data.len());
-            Some(data)
-        }
-        Err(e) => {
-            log::warn!("Failed to load custom cape texture from {}: {}", CAPE_TEXTURE_PATH, e);
-            log::info!("Make sure xelo_cape.png exists in the origin_mods folder and is a valid PNG file");
-            None
-        }
-    }
-}
-
-// Improved player.entity.json modification with better error handling
-fn modify_player_entity_json(original_data: &[u8]) -> Option<Vec<u8>> {
-    let json_str = match std::str::from_utf8(original_data) {
-        Ok(s) => s,
-        Err(e) => {
-            log::error!("Failed to parse player.entity.json as UTF-8: {}", e);
-            return None;
-        }
-    };
-    
-    let mut json_value: Value = match serde_json::from_str(json_str) {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("Failed to parse player.entity.json as JSON: {}", e);
-            return None;
-        }
-    };
-    
-    // Navigate to the render_controllers array
-    if let Some(client_entity) = json_value
-        .get_mut("minecraft:client_entity")
-        .and_then(|ce| ce.as_object_mut())
-    {
-        if let Some(description) = client_entity
-            .get_mut("description")
-            .and_then(|desc| desc.as_object_mut())
-        {
-            // Get the existing render_controllers array
-            if let Some(render_controllers) = description
-                .get_mut("render_controllers")
-                .and_then(|rc| rc.as_array_mut())
-            {
-                // Create the cape render controller object
-                let cape_controller = serde_json::json!({
-                    "controller.render.player.cape": "(query.armor_texture_slot(1) != 5) && (!variable.is_first_person || variable.is_paperdoll) && (!variable.map_face_icon)"
-                });
-                
-                // Check if cape controller already exists
-                let cape_exists = render_controllers.iter().any(|controller| {
-                    if let Some(obj) = controller.as_object() {
-                        obj.contains_key("controller.render.player.cape")
-                    } else {
-                        false
-                    }
-                });
-                
-                if !cape_exists {
-                    render_controllers.push(cape_controller);
-                    log::info!("Added cape render controller to player.entity.json");
-                } else {
-                    log::info!("Cape render controller already exists in player.entity.json");
-                }
-            } else {
-                log::error!("render_controllers array not found in player.entity.json");
-                return None;
-            }
-            
-            // Verify textures section has cape texture (should already exist in the default file)
-            if let Some(textures) = description.get("textures").and_then(|t| t.as_object()) {
-                if textures.contains_key("cape") {
-                    log::info!("Cape texture reference already exists in player.entity.json");
-                } else {
-                    log::warn!("Cape texture reference missing from player.entity.json");
-                }
-            } else {
-                log::error!("Textures section not found in player.entity.json");
-                return None;
-            }
-            
-        } else {
-            log::error!("description object not found in player.entity.json");
-            return None;
-        }
-    } else {
-        log::error!("minecraft:client_entity not found in player.entity.json");
-        return None;  
-    }
-    
-    // Convert back to JSON string with proper formatting
-    match serde_json::to_string_pretty(&json_value) {
-        Ok(modified_json) => Some(modified_json.into_bytes()),
-        Err(e) => {
-            log::error!("Failed to serialize modified player.entity.json: {}", e);
-            None
-        }
-    }
-} => {
-            log::error!("Shader fixing is disabled as no mc version was found");
-            return None;
-        }
-    };
-    let mut buf = Vec::with_capacity(file.length());
-    if let Err(e) = file.read_to_end(&mut buf) {
-        log::error!("Something is wrong with AssetManager, mc detection failed: {e}");
-        return None;
-    };
-    for version in materialbin::ALL_VERSIONS {
-        if buf
-            .pread_with::<CompiledMaterialDefinition>(0, version)
-            .is_ok()
-        {
-            log::info!("Mc version is {version}");
-            return Some(version);
-        };
-    }
-    None
-}
-
-fn get_uitext(man: ndk::asset::AssetManager) -> Option<Asset> {
-    let paths = [
-        "assets/renderer/materials/UIText.material.bin",
-        "renderer/materials/UIText.material.bin",
-    ];
-    for path in paths {
-        if let Some(asset) = man.open(path) {
-            return Some(asset);
-        }
-    }
-    None
-}
-
-macro_rules! folder_list {
-    ($( apk: $apk_folder:literal -> pack: $pack_folder:expr),
-        *,
-    ) => {
-        [
-            $(($apk_folder, $pack_folder)),*,
-        ]
-    }
-}
-
-fn get_no_fog_material_data(filename: &str) -> Option<&'static [u8]> {
-    if !is_no_fog_enabled() {
-        return None;
-    }
-    
-    match filename {
-        "RenderChunk.material.bin" => Some(RENDER_CHUNK_MATERIAL_BIN),
-        _ => None,
-    }
-}
-
-fn get_nightvision_material_data(filename: &str) -> Option<&'static [u8]> {
-    if !is_night_vision_enabled() {
-        return None;
-    }
-    
-    match filename {
-        "RenderChunk.material.bin" => Some(RENDER_CHUNK_NV_MATERIAL_BIN),
-        _ => None,
-    }
-}
-
-fn get_java_cubemap_material_data(filename: &str) -> Option<&'static [u8]> {
-    if !is_java_cubemap_enabled() {
-        return None;
-    }
-    
-    match filename {
-        "LegacyCubemap.material.bin" => Some(LEGACY_CUBEMAP_MATERIAL_BIN),
-        _ => None,
-    }
-}
-
-fn get_title_png_data(filename: &str) -> Option<&'static [u8]> {
-    if !is_xelo_title_enabled() {
-        return None;
-    }
-    
-    match filename {
-        "title.png" => Some(TITLE_PNG),
-        _ => None,
-    }
-}
-
-// Fixed particles disabler - replace content with empty JSON instead of blocking
-fn is_particles_file_to_replace(c_path: &Path) -> bool {
-    if !is_particles_disabler_enabled() {
-        return false;
-    }
-    
-    let path_str = c_path.to_string_lossy();
-    
-    // Check if the path contains "particles/" and ends with .json
-    if path_str.contains("particles/") && path_str.ends_with(".json") {
-        return true;
-    }
-    
-    // Also check specific particle file patterns
-    let filename = match c_path.file_name() {
-        Some(name) => name.to_string_lossy(),
-        None => return false,
-    };
-    
-    let particle_files = [
-        "arrowspell.json",
-        "balloon_gas.json",
-        "basic_bubble.json",
-        "basic_bubble_manual.json",
-        "basic_crit.json",
-        "basic_flame.json",
-        "basic_portal.json",
-        "basic_smoke.json",
-        "bleach.json",
-        "block_destruct.json",
-        "breaking_item_icon.json",
-        "breaking_item_terrain.json",
-        "bubble_column_bubble.json",
-        "bubble_column_down.json",
-        "bubble_column_up.json",
-        "camera_shoot_explosion.json",
-        "campfire_smoke.json",
-        "campfire_smoke_tall.json",
-        "cauldron_bubble.json",
-        "cauldron_splash.json",
-        "cauldronspell.json",
-        "colored_flame.json",
-        "conduit.json",
-        "conduit_absorb.json",
-        "conduit_attack.json",
-        "critical_hit.json",
-        "dolphin_move.json",
-        "dragon_breath_fire.json",
-        "dragon_breath_lingering.json",
-        "dragon_breath_trail.json",
-        "dragon_death_explosion.json",
-        "dragon_destroy_block.json",
-        "dragon_dying_explosion.json",
-        "enchanting_table_particle.json",
-        "end_chest.json",
-        "endrod.json",
-        "evaporation_elephant_toothpaste.json",
-        "evocation_fang.json",
-        "evoker_spell.json",
-        "explosion_cauldron.json",
-        "explosion_death.json",
-        "explosion_egg_destroy.json",
-        "explosion_eyeofender_death.json",
-        "explosion_labtable_fire.json",
-        "explosion_level.json",
-        "explosion_manual.json",
-        "eye_of_ender_bubble.json",
-        "falling_border_dust.json",
-        "falling_dust.json",
-        "falling_dust_concrete_powder.json",
-        "falling_dust_dragon_egg.json",
-        "falling_dust_gravel.json",
-        "falling_dust_red_sand.json",
-        "falling_dust_sand.json",
-        "falling_dust_scaffolding.json",
-        "falling_dust_top_snow.json",
-        "fish_hook.json",
-        "fish_pos.json",
-        "guardian_attack.json",
-        "guardian_water_move.json",
-        "heart.json",
-        "huge_explosion_lab_misc.json",
-        "huge_explosion_level.json",
-        "ice_evaporation.json",
-        "ink.json",
-        "knockback_roar.json",
-        "lab_table_heatblock_dust.json",
-        "lab_table_misc_mystical.json",
-        "large_explosion_level.json",
-        "lava_drip.json",
-        "lava_particle.json",
-        "llama_spit.json",
-        "magnesium_salts.json",
-        "mob_block_spawn.json",
-        "mob_portal.json",
-        "mobflame.json",
-        "mobflame_single.json",
-        "mobspell.json",
-        "mycelium_dust.json",
-        "note.json",
-        "obsidian_glow_dust.json",
-        "phantom_trail.json",
-        "portal_directional.json",
-        "portal_east_west.json",
-        "portal_north_south.json",
-        "rain_splash.json",
-        "redstone_ore_dust.json",
-        "redstone_repeater_dust.json",
-        "redstone_torch_dust.json",
-        "redstone_wire_dust.json",
-        "rising_border_dust.json",
-        "shulker_bullet.json",
-        "silverfish_grief.json",
-        "sneeze.json",
-        "sparkler.json",
-        "splashpotionspell.json",
-        "sponge_absorb_bubble.json",
-        "squid_flee.json",
-        "squid_ink_bubble.json",
-        "squid_move.json",
-        "stunned.json",
-        "totem.json",
-        "totem_manual.json",
-        "underwater_torch_bubble.json",
-        "villager_angry.json",
-        "villager_happy.json",
-        "water_drip.json",
-        "water_evaporation_actor.json",
-        "water_evaporation_bucket.json",
-        "water_evaporation_manual.json",
-        "water_splash.json",
-        "water_splash_manual.json",
-        "water_wake.json",
-        "witchspell.json",
-        "wither_boss_invulnerable.json",
-    ];
-    
-// Enhanced cape_invisible texture detection with more patterns
-fn is_cape_invisible_texture_file(c_path: &Path) -> bool {
-    if !is_client_capes_enabled() {
-        return false;
-    }
-    
-    let path_str = c_path.to_string_lossy();
-    let filename = c_path.file_name().map(|n| n.to_string_lossy()).unwrap_or_default();
-    
-    // Check for cape_invisible texture in various possible locations
-    let cape_invisible_patterns = [
-        "textures/entity/cape_invisible.png",
-        "/textures/entity/cape_invisible.png",
-        "textures/entity/cape_invisible",
-        "/textures/entity/cape_invisible",
-        "entity/cape_invisible.png",
-        "/entity/cape_invisible.png",
-        "entity/cape_invisible",
-        "/entity/cape_invisible",
-        "resource_packs/vanilla/textures/entity/cape_invisible.png",
-        "assets/resource_packs/vanilla/textures/entity/cape_invisible.png",
-        "vanilla/textures/entity/cape_invisible.png",
-        "resource_packs/vanilla/textures/entity/cape_invisible",
-        "assets/resource_packs/vanilla/textures/entity/cape_invisible",
-        "vanilla/textures/entity/cape_invisible",
-    ];
-    
-    // Also check if filename itself is cape_invisible.png
-    if filename == "cape_invisible.png" || filename == "cape_invisible" {
-        return true;
-    }
-    
-    cape_invisible_patterns.iter().any(|pattern| {
-        path_str.contains(pattern) || path_str.ends_with(pattern)
-    })
-}
-
-// Enhanced clouds detection with more patterns
-fn is_clouds_texture_file(c_path: &Path) -> bool {
-    if !is_java_clouds_enabled() {
-        return false;
-    }
-    
-    let path_str = c_path.to_string_lossy();
-    
-    let cloud_patterns = [
-        "textures/environment/clouds.png",
-        "/textures/environment/clouds.png",
-        "environment/clouds.png",
-        "/environment/clouds.png",
-        "clouds.png",
-        "textures/clouds.png",
-        "/textures/clouds.png",
-        "resource_packs/vanilla/textures/environment/clouds.png",
-        "assets/resource_packs/vanilla/textures/environment/clouds.png",
-        "vanilla/textures/environment/clouds.png",
-    ];
-    
-    cloud_patterns.iter().any(|pattern| {
-        path_str.contains(pattern) || path_str.ends_with(pattern)
-    })
-}
-
-fn is_skin_file_path(c_path: &Path, filename: &str) -> bool {
-    let path_str = c_path.to_string_lossy();
-    
-    let possible_paths = [
-        format!("vanilla/{}", filename),
-        format!("skin_packs/vanilla/{}", filename),
-        format!("resource_packs/vanilla/{}", filename),
-        format!("assets/skin_packs/vanilla/{}", filename),
-    ];
-    
-    possible_paths.iter().any(|path| {
-        path_str.contains(path) || path_str.ends_with(path)
-    })
-}
-
-fn is_classic_skins_steve_texture_file(c_path: &Path) -> bool {
-    if !is_classic_skins_enabled() {
-        return false;
-    }
-    
-    is_skin_file_path(c_path, "steve.png")
-}
-
-fn is_classic_skins_alex_texture_file(c_path: &Path) -> bool {
-    if !is_classic_skins_enabled() {
-        return false;
-    }
-    
-    is_skin_file_path(c_path, "alex.png")
-}
-
-fn is_classic_skins_json_file(c_path: &Path) -> bool {
-    if !is_classic_skins_enabled() {
-        return false;
-    }
-    
-    is_skin_file_path(c_path, "skins.json")
-}
-
-// Enhanced cape render controllers detection
-fn is_client_capes_file(c_path: &Path) -> bool {
-    if !is_client_capes_enabled() {
-        return false;
-    }
-    
-    let filename = match c_path.file_name() {
-        Some(name) => name.to_string_lossy(),
-        None => return false,
-    };
-    
-    // Check for cape render controller files
-    let cape_render_files = [
-        "cape.render_controllers.json"
-    ];
-    
-    cape_render_files.contains(&filename.as_ref())
-}
-
-fn is_outline_material_file(c_path: &Path) -> bool {
-    if !is_block_whiteoutline_enabled() {
-        return false;
-    }
-    
-    let filename = match c_path.file_name() {
-        Some(name) => name.to_string_lossy(),
-        None => return false,
-    };
-    
-    // Check for cape render controller files
-    let outline_material_files = [
-        "ui3D.material"
-    ];
-    
-    outline_material_files.contains(&filename.as_ref())
-}
-
-fn is_persona_file_to_block(c_path: &Path) -> bool {
-    if !is_classic_skins_enabled() {
-        return false;
-    }
-    
-    let path_str = c_path.to_string_lossy();
-    
-    let blocked_personas = [
-        "persona/08_Kai_Dcast.json",
-        "persona/07_Zuri_Dcast.json", 
-        "persona/06_Efe_Dcast.json",
-        "persona/05_Makena_Dcast.json",
-        "persona/04_Sunny_Dcast.json",
-        "persona/03_Ari_Dcast.json",
-        "persona/02_ Noor_Dcast.json", 
-    ];
-    
-    blocked_personas.iter().any(|persona_path| {
-        path_str.contains(persona_path) || path_str.ends_with(persona_path)
-    })
-}
-
-// Cape physics helper functions
-fn is_cape_animation_file(c_path: &Path) -> bool {
-    if !is_cape_physics_enabled() {
-        return false;
-    }
-    
-    let path_str = c_path.to_string_lossy();
-    let filename = match c_path.file_name() {
-        Some(name) => name.to_string_lossy(),
-        None => return false,
-    };
-    
-    // Check for cape.animation.json in animations folder
-    if filename != "cape.animation.json" {
-        return false;
-    }
-    
-    let animation_patterns = [
-        "animations/cape.animation.json",
-        "/animations/cape.animation.json",
-        "vanilla/animations/cape.animation.json",
-        "/vanilla/animations/cape.animation.json",
-        "resource_packs/vanilla/animations/cape.animation.json",
-        "assets/resource_packs/vanilla/animations/cape.animation.json",
-    ];
-    
-    animation_patterns.iter().any(|pattern| {
-        path_str.contains(pattern) || path_str.ends_with(pattern)
-    })
-}
-
-fn is_cape_geo_file(c_path: &Path) -> bool {
-    if !is_cape_physics_enabled() {
-        return false;
-    }
-    
-    let path_str = c_path.to_string_lossy();
-    let filename = match c_path.file_name() {
-        Some(name) => name.to_string_lossy(),
-        None => return false,
-    };
-    
-    // Check for cape.geo.json in models/entity folder
-    if filename != "cape.geo.json" {
-        return false;
-    }
-    
-    let geo_patterns = [
-        "models/entity/cape.geo.json",
-        "/models/entity/cape.geo.json",
-        "vanilla/models/entity/cape.geo.json",
-        "/vanilla/models/entity/cape.geo.json",
-        "resource_packs/vanilla/models/entity/cape.geo.json",
-        "assets/resource_packs/vanilla/models/entity/cape.geo.json",
-    ];
-    
-    geo_patterns.iter().any(|pattern| {
-        path_str.contains(pattern) || path_str.ends_with(pattern)
-    })
-}
-
-fn is_mobs_json_file(c_path: &Path) -> bool {
-    if !is_cape_physics_enabled() {
-        return false;
-    }
-    
-    let filename = match c_path.file_name() {
-        Some(name) => name.to_string_lossy(),
-        None => return false,
-    };
-    
-    filename == "mobs.json"
-}
-
-// Function to modify mobs.json by removing cape geometry
-fn modify_mobs_json_remove_cape(original_data: &[u8]) -> Option<Vec<u8>> {
-    let json_str = match std::str::from_utf8(original_data) {
-        Ok(s) => s,
-        Err(e) => {
-            log::error!("Failed to parse mobs.json as UTF-8: {}", e);
-            return None;
-        }
-    };
-    
-    let mut json_value: Value = match serde_json::from_str(json_str) {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("Failed to parse mobs.json as JSON: {}", e);
-            return None;
-        }
-    };
-    
-    // Navigate to minecraft:client_entity -> description -> geometry
-    if let Some(client_entity) = json_value
-        .get_mut("minecraft:client_entity")
-        .and_then(|ce| ce.as_object_mut())
-    {
-        if let Some(description) = client_entity
-            .get_mut("description")
-            .and_then(|desc| desc.as_object_mut())
-        {
-            if let Some(geometry) = description
-                .get_mut("geometry")
-                .and_then(|geom| geom.as_object_mut())
-            {
-                // Remove the cape geometry
-                if geometry.remove("cape").is_some() {
-                    log::info!("Removed geometry.cape from mobs.json");
-                } else {
-                    log::info!("geometry.cape not found in mobs.json");
-                }
-            }
-        }
-    }
-    
-    serde_json::to_string_pretty(&json_value)
-        .ok()
-        .map(|s| s.into_bytes())
-}
-
-// Function to detect vanilla/contents.json
-fn is_vanilla_contents_file(c_path: &Path) -> bool {
-    if !is_cape_physics_enabled() {
-        return false;
-    }
-    
-    let path_str = c_path.to_string_lossy();
-    let filename = match c_path.file_name() {
-        Some(name) => name.to_string_lossy(),
-        None => return false,
-    };
-    
-    // Must be exactly contents.json
-    if filename != "contents.json" {
-        return false;
-    }
-    
-    // Check if it's in vanilla folder
-    let contents_patterns = [
-        "vanilla/contents.json",
-        "/vanilla/contents.json",
-        "resource_packs/vanilla/contents.json",
-        "assets/resource_packs/vanilla/contents.json",
-        "assets/vanilla/contents.json",
-    ];
-    
-    contents_patterns.iter().any(|pattern| {
-        path_str.contains(pattern) || path_str.ends_with(pattern)
-    })
-}
-
-// Function to modify vanilla/contents.json by adding cape files
-fn modify_vanilla_contents_json(original_data: &[u8]) -> Option<Vec<u8>> {
-    let json_str = match std::str::from_utf8(original_data) {
-        Ok(s) => s,
-        Err(e) => {
-            log::error!("Failed to parse contents.json as UTF-8: {}", e);
-            return None;
-        }
-    };
-    
-    let mut json_value: Value = match serde_json::from_str(json_str) {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("Failed to parse contents.json as JSON: {}", e);
-            return None;
-        }
-    };
-    
-    // Get the content array
-    if let Some(content_array) = json_value
-        .get_mut("content")
-        .and_then(|content| content.as_array_mut())
-    {
-        // Check if cape files already exist
-        let cape_geo_exists = content_array.iter().any(|item| {
-            if let Some(path) = item.get("path").and_then(|p| p.as_str()) {
-                path == "models/entity/cape.geo.json"
-            } else {
-                false
-            }
-        });
-        
-        let cape_animation_exists = content_array.iter().any(|item| {
-            if let Some(path) = item.get("path").and_then(|p| p.as_str()) {
-                path == "animations/cape.animation.json"
-            } else {
-                false
-            }
-        });
-        
-        // Add cape.geo.json if it doesn't exist
-        if !cape_geo_exists {
-            let cape_geo_entry = serde_json::json!({
-                "path": "models/entity/cape.geo.json"
-            });
-            content_array.push(cape_geo_entry);
-            log::info!("Added models/entity/cape.geo.json to contents.json");
-        } else {
-            log::info!("models/entity/cape.geo.json already exists in contents.json");
-        }
-        
-        // Add cape.animation.json if it doesn't exist
-        if !cape_animation_exists {
-            let cape_animation_entry = serde_json::json!({
-                "path": "animations/cape.animation.json"
-            });
-            content_array.push(cape_animation_entry);
-            log::info!("Added animations/cape.animation.json to contents.json");
-        } else {
-            log::info!("animations/cape.animation.json already exists in contents.json");
-        }
-        
-    } else {
-        log::error!("content array not found in contents.json");
-        return None;
-    }
-    
-    // Convert back to JSON string with proper formatting
-    match serde_json::to_string_pretty(&json_value) {
-        Ok(modified_json) => Some(modified_json.into_bytes()),
-        Err(e) => {
-            log::error!("Failed to serialize modified contents.json: {}", e);
-            None
         }
     }
 }
