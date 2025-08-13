@@ -442,6 +442,10 @@ const RENDER_JSON: &str = r#"{
             "textures": [
                 "Texture.cape"
             ]
+        }
+    }
+}"#;
+
 pub(crate) unsafe fn open(
     man: *mut AAssetManager,
     fname: *const libc::c_char,
