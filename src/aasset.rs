@@ -154,6 +154,17 @@ fn get_entity_material_data(filename: &str) -> Option<&'static [u8]> {
     }
 }
 
+fn get_side_shield_data(filename: &str) -> Option<&'static [u8]> {
+    if !is_entity_culling_enabled() {
+        return None;
+    }
+    
+    match filename {
+        "shield.animation.json" => Some(SHIELD_ANIMATION_JSON),
+        _ => None,
+    }
+}
+
 fn get_java_cubemap_material_data(filename: &str) -> Option<&'static [u8]> {
     if !is_java_cubemap_enabled() {
         return None;
@@ -444,23 +455,6 @@ fn is_outline_material_file(c_path: &Path) -> bool {
     ];
     
     outline_material_files.contains(&filename.as_ref())
-}
-
-fn is_side_material_file(c_path: &Path) -> bool {
-    if !is_side_shield_enabled() {
-        return false;
-    }
-    
-    let filename = match c_path.file_name() {
-        Some(name) => name.to_string_lossy(),
-        None => return false,
-    };
-    
-    let side_material_files = [
-        "shield.animation.json"
-    ];
-    
-    side_material_files.contains(&filename.as_ref())
 }
 
 fn is_persona_file_to_block(c_path: &Path) -> bool {
@@ -802,13 +796,6 @@ pub(crate) unsafe fn open(
         return aasset;
     }
     
-    if is_side_material_file(c_path) {
-        log::info!("Intercepting  shieldanimationjson file with new content: {}", c_path.display());
-        let buffer = SHIELD_ANIMATION_JSON.as_bytes().to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
     
     // No hurt cam camera replacements
     if is_no_hurt_cam_enabled() {
@@ -867,6 +854,13 @@ pub(crate) unsafe fn open(
         return aasset;
     }
     
+    if let Some(side_shield_data) = get_side_shield_data(&filename_str) {
+        log::info!("Intercepting {} with side shield (side shield enabled)", filename_str);
+        let buffer = side_shield_data.to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
     
     if let Some(java_cubemap_data) = get_java_cubemap_material_data(&filename_str) {
         log::info!("Intercepting {} with java-cubemap material (java-cubemap enabled)", filename_str);
