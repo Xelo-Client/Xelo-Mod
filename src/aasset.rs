@@ -443,6 +443,610 @@ const RENDER_JSON: &str = r#"{
             ]
         }
     }
+}
+
+pub(crate) unsafe fn open(
+    man: *mut AAssetManager,
+    fname: *const libc::c_char,
+    mode: libc::c_int,
+) -> *mut ndk_sys::AAsset {
+    let aasset = unsafe { ndk_sys::AAssetManager_open(man, fname, mode) };
+    let c_str = unsafe { CStr::from_ptr(fname) };
+    let raw_cstr = c_str.to_bytes();
+    let os_str = OsStr::from_bytes(raw_cstr);
+    let c_path: &Path = Path::new(os_str);
+    
+    let Some(os_filename) = c_path.file_name() else {
+        log::warn!("Path had no filename: {c_path:?}");
+        return aasset;
+    };
+
+    // Debug logging for client capes
+    if is_client_capes_enabled() {
+        let path_str = c_path.to_string_lossy();
+        if path_str.contains("cape") || path_str.contains("player.entity") {
+            log::info!("Client capes enabled - checking file: {}", c_path.display());
+        }
+    }
+    
+    // Debug logging for particles disabler
+    if is_particles_disabler_enabled() {
+        let path_str = c_path.to_string_lossy();
+        if path_str.contains("particle") || path_str.contains("effect") {
+            log::info!("Particles disabler enabled - checking file: {}", c_path.display());
+        }
+    }
+    
+    // Handle particles disabler - replace particle files with empty JSON
+    if is_particles_folder_to_block(c_path) {
+        log::info!("Replacing particles file with empty JSON due to particles_disabler enabled: {}", c_path.display());
+        let buffer = EMPTY_PARTICLE_JSON.as_bytes().to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+    
+    // Handle cape_invisible texture replacement
+    if is_cape_invisible_texture_file(c_path) {
+        log::info!("Intercepting cape_invisible texture with custom cape: {}", c_path.display());
+        
+        if let Some(custom_cape_data) = load_custom_cape_texture() {
+            let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+            wanted_lock.insert(AAssetPtr(aasset), Cursor::new(custom_cape_data));
+            return aasset;
+        } else {
+            log::warn!("Custom cape texture not found, blocking cape_invisible texture");
+            // Block the original cape_invisible texture if custom one isn't available
+            if !aasset.is_null() {
+                ndk_sys::AAsset_close(aasset);
+            }
+            return std::ptr::null_mut();
+        }
+    }
+
+    // Block persona files if classic skins enabled
+    if is_persona_file_to_block(c_path) {
+        log::info!("Blocking persona file due to classic_skins enabled: {}", c_path.display());
+        if !aasset.is_null() {
+            ndk_sys::AAsset_close(aasset);
+        }
+        return std::ptr::null_mut();
+    }
+
+    // Handle mobs.json cape removal for cape physics
+    if is_mobs_json_file(c_path) {
+        log::info!("Intercepting mobs.json to remove cape geometry (cape physics enabled): {}", c_path.display());
+        
+        // Read the original file first
+        if aasset.is_null() {
+            log::error!("Failed to open original mobs.json");
+            return aasset;
+        }
+        
+        let length = ndk_sys::AAsset_getLength(aasset) as usize;
+        if length == 0 {
+            log::error!("mobs.json has zero length");
+            return aasset;
+        }
+        
+        let mut original_data = vec![0u8; length];
+        let bytes_read = ndk_sys::AAsset_read(aasset, original_data.as_mut_ptr() as *mut libc::c_void, length);
+        
+        if bytes_read != length as i32 {
+            log::error!("Failed to read original mobs.json completely (read {}, expected {})", bytes_read, length);
+            return aasset;
+        }
+        
+        // Reset the asset position for normal operation
+        ndk_sys::AAsset_seek(aasset, 0, libc::SEEK_SET);
+        
+        if let Some(modified_data) = modify_mobs_json_remove_cape(&original_data) {
+            let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+            wanted_lock.insert(AAssetPtr(aasset), Cursor::new(modified_data));
+            return aasset;
+        } else {
+            log::warn!("Failed to modify mobs.json, using original");
+            return aasset;
+        }
+    }
+
+    // Handle player.animation.json cape removal
+    if is_player_animation_file(c_path) {
+        log::info!("Intercepting player.animation.json to remove cape animation");
+        
+        if !aasset.is_null() {
+            let length = ndk_sys::AAsset_getLength(aasset) as usize;
+            if length > 0 {
+                let mut original_data = vec![0u8; length];
+                let bytes_read = ndk_sys::AAsset_read(aasset, original_data.as_mut_ptr() as *mut libc::c_void, length);
+                
+                if bytes_read == length as i32 {
+                    ndk_sys::AAsset_seek(aasset, 0, libc::SEEK_SET);
+                    
+                    if let Some(modified_data) = modify_player_animation_remove_cape(&original_data) {
+                        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+                        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(modified_data));
+                        return aasset;
+                    }
+                }
+            }
+        }
+    }
+
+    // Handle vanilla/contents.json modification to add cape files
+    if is_vanilla_contents_file(c_path) {
+        log::info!("Intercepting vanilla/contents.json to add cape file entries");
+        
+        if !aasset.is_null() {
+            let length = ndk_sys::AAsset_getLength(aasset) as usize;
+            if length > 0 {
+                let mut original_data = vec![0u8; length];
+                let bytes_read = ndk_sys::AAsset_read(aasset, original_data.as_mut_ptr() as *mut libc::c_void, length);
+                
+                if bytes_read == length as i32 {
+                    ndk_sys::AAsset_seek(aasset, 0, libc::SEEK_SET);
+                    
+                    if let Some(modified_data) = modify_vanilla_contents_add_cape_files(&original_data) {
+                        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+                        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(modified_data));
+                        return aasset;
+                    }
+                }
+            }
+        }
+    }
+
+    // Handle cape.animation.json creation
+    if is_cape_animation_file(c_path) {
+        log::info!("Intercepting cape.animation.json with cape animation content: {}", c_path.display());
+        let buffer = CAPE_ANIMATION_JSON.as_bytes().to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+
+    // Handle cape.geo.json creation  
+    if is_cape_geo_file(c_path) {
+        log::info!("Intercepting cape.geo.json with cape geometry content: {}", c_path.display());
+        let buffer = CAPE_GEO_JSON.as_bytes().to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+    
+    // Handle player.entity.json modification
+    if is_player_entity_file(c_path) {
+        log::info!("Intercepting player.entity.json with client capes modification: {}", c_path.display());
+        
+        // Read the original file first
+        if aasset.is_null() {
+            log::error!("Failed to open original player.entity.json");
+            return aasset;
+        }
+        
+        let length = ndk_sys::AAsset_getLength(aasset) as usize;
+        if length == 0 {
+            log::error!("player.entity.json has zero length");
+            return aasset;
+        }
+        
+        let mut original_data = vec![0u8; length];
+        let bytes_read = ndk_sys::AAsset_read(aasset, original_data.as_mut_ptr() as *mut libc::c_void, length);
+        
+        if bytes_read != length as i32 {
+            log::error!("Failed to read original player.entity.json completely (read {}, expected {})", bytes_read, length);
+            return aasset;
+        }
+        
+        // Reset the asset position for normal operation
+        ndk_sys::AAsset_seek(aasset, 0, libc::SEEK_SET);
+        
+        if let Some(modified_data) = modify_player_entity_json(&original_data) {
+            let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+            wanted_lock.insert(AAssetPtr(aasset), Cursor::new(modified_data));
+            return aasset;
+        } else {
+            log::warn!("Failed to modify player.entity.json, using original");
+            return aasset;
+        }
+    }
+    
+    
+    // Custom loading messages
+    if os_filename == "loading_messages.json" {
+        log::info!("Intercepting loading_messages.json with custom content");
+        let buffer = CUSTOM_LOADING_MESSAGES_JSON.as_bytes().to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+    
+    // Java clouds texture replacement
+    if is_clouds_texture_file(c_path) {
+        log::info!("Intercepting clouds texture with Java clouds texture: {}", c_path.display());
+        let buffer = JAVA_CLOUDS_TEXTURE.to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+
+    // Classic skins replacements
+    if is_classic_skins_steve_texture_file(c_path) {
+        log::info!("Intercepting steve.png with classic Steve texture: {}", c_path.display());
+        let buffer = CLASSIC_STEVE_TEXTURE.to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+    
+    if is_classic_skins_alex_texture_file(c_path) {
+        log::info!("Intercepting alex.png with classic Alex texture: {}", c_path.display());
+        let buffer = CLASSIC_ALEX_TEXTURE.to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+    
+    if is_classic_skins_json_file(c_path) {
+        log::info!("Intercepting skins.json with classic skins content: {}", c_path.display());
+        let buffer = CUSTOM_SKINS_JSON.as_bytes().to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+    
+    // Handle cape render controllers
+    if is_client_capes_file(c_path) {
+        log::info!("Intercepting cape render controller file with cape content: {}", c_path.display());
+        let buffer = RENDER_JSON.as_bytes().to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+    
+    if is_outline_material_file(c_path) {
+        log::info!("Intercepting ui3dmaterial file with new content: {}", c_path.display());
+        let buffer = CUSTOM_BLOCKOUTLINE.as_bytes().to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+    
+    // No hurt cam camera replacements
+    if is_no_hurt_cam_enabled() {
+        let path_str = c_path.to_string_lossy();
+        
+        if path_str.contains("cameras/") {
+            if os_filename == "first_person.json" {
+                log::info!("Intercepting cameras/first_person.json with custom content (nohurtcam enabled)");
+                let buffer = CUSTOM_FIRST_PERSON_JSON.as_bytes().to_vec();
+                let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+                wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+                return aasset;
+            }
+            
+            if os_filename == "third_person.json" {
+                log::info!("Intercepting cameras/third_person.json with custom content (nohurtcam enabled)");
+                let buffer = CUSTOM_THIRD_PERSON_JSON.as_bytes().to_vec();
+                let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+                wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+                return aasset;
+            }
+            
+            if os_filename == "third_person_front.json" {
+                log::info!("Intercepting cameras/third_person_front.json with custom content (nohurtcam enabled)");
+                let buffer = CUSTOM_THIRD_PERSON_FRONT_JSON.as_bytes().to_vec();
+                let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+                wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+                return aasset;
+            }
+        }
+    }
+
+    // Material replacements
+    let filename_str = os_filename.to_string_lossy();
+    if let Some(no_fog_data) = get_no_fog_material_data(&filename_str) {
+        log::info!("Intercepting {} with no-fog material (no-fog enabled)", filename_str);
+        let buffer = no_fog_data.to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+    
+    if let Some(night_vision_data) = get_nightvision_material_data(&filename_str) {
+        log::info!("Intercepting {} with night-vision material (night-vision enabled)", filename_str);
+        let buffer = night_vision_data.to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+    
+    if let Some(java_cubemap_data) = get_java_cubemap_material_data(&filename_str) {
+        log::info!("Intercepting {} with java-cubemap material (java-cubemap enabled)", filename_str);
+        let buffer = java_cubemap_data.to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+    
+    if let Some(title_png_data) = get_title_png_data(&filename_str) {
+        log::info!("Intercepting {} with xelo title png (xelo-title enabled)", filename_str);
+        let buffer = title_png_data.to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+
+    // Resource pack loading logic
+    let stripped = match c_path.strip_prefix("assets/") {
+        Ok(yay) => yay,
+        Err(_e) => c_path,
+    };
+    
+    let replacement_list = folder_list! {
+        apk: "gui/dist/hbui/" -> pack: "hbui/",
+        apk: "skin_packs/persona/" -> pack: "persona/",
+        apk: "renderer/" -> pack: "renderer/",
+        apk: "resource_packs/vanilla/cameras/" -> pack: "vanilla_cameras/",
+    };
+    
+    for replacement in replacement_list {
+        if let Ok(file) = stripped.strip_prefix(replacement.0) {
+            cxx::let_cxx_string!(cxx_out = "");
+            let loadfn = match crate::RPM_LOAD.get() {
+                Some(ptr) => ptr,
+                None => {
+                    log::warn!("ResourcePackManager fn is not ready yet?");
+                    return aasset;
+                }
+            };
+            let mut arraybuf = [0; 128];
+            let file_path = opt_path_join(&mut arraybuf, &[Path::new(replacement.1), file]);
+            let packm_ptr = crate::PACKM_OBJ.load(std::sync::atomic::Ordering::Acquire);
+            let resource_loc = ResourceLocation::from_str(file_path.as_ref());
+            log::info!("loading rpck file: {:#?}", &file_path);
+            if packm_ptr.is_null() {
+                log::error!("ResourcePackManager ptr is null");
+                return aasset;
+            }
+            loadfn(packm_ptr, resource_loc, cxx_out.as_mut());
+            if cxx_out.is_empty() {
+                log::info!("File was not found");
+                return aasset;
+            }
+            let buffer = if os_filename.as_encoded_bytes().ends_with(b".material.bin") {
+                match process_material(man, cxx_out.as_bytes()) {
+                    Some(updated) => updated,
+                    None => cxx_out.as_bytes().to_vec(),
+                }
+            } else {
+                cxx_out.as_bytes().to_vec()
+            };
+            let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+            wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+            return aasset;
+        }
+    }
+    return aasset;
+}
+
+fn opt_path_join<'a>(bytes: &'a mut [u8; 128], paths: &[&Path]) -> Cow<'a, CStr> {
+    let total_len: usize = paths.iter().map(|p| p.as_os_str().len()).sum();
+    if total_len + 1 > 128 {
+        let mut pathbuf = PathBuf::new();
+        for path in paths {
+            pathbuf.push(path);
+        }
+        let cpath = CString::new(pathbuf.into_os_string().as_encoded_bytes()).unwrap();
+        return Cow::Owned(cpath);
+    }
+
+    let mut writer = bytes.as_mut_slice();
+    for path in paths {
+        let osstr = path.as_os_str().as_bytes();
+        let _ = writer.write(osstr);
+    }
+    let _ = writer.write(&[0]);
+    let guh = CStr::from_bytes_until_nul(bytes).unwrap();
+    Cow::Borrowed(guh)
+}
+
+fn process_material(man: *mut AAssetManager, data: &[u8]) -> Option<Vec<u8>> {
+    let mcver = MC_VERSION.get_or_init(|| {
+        let pointer = match std::ptr::NonNull::new(man) {
+            Some(yay) => yay,
+            None => {
+                log::warn!("AssetManager is null?, preposterous, mc detection failed");
+                return None;
+            }
+        };
+        let manager = unsafe { ndk::asset::AssetManager::from_ptr(pointer) };
+        get_current_mcver(manager)
+    });
+    let mcver = (*mcver)?;
+    for version in materialbin::ALL_VERSIONS {
+        let material: CompiledMaterialDefinition = match data.pread_with(0, version) {
+            Ok(data) => data,
+            Err(e) => {
+                log::trace!("[version] Parsing failed: {e}");
+                continue;
+            }
+        };
+        if version == mcver {
+            return None;
+        }
+        let mut output = Vec::with_capacity(data.len());
+        if let Err(e) = material.write(&mut output, mcver) {
+            log::trace!("[version] Write error: {e}");
+            return None;
+        }
+        return Some(output);
+    }
+
+    None
+}
+
+pub(crate) unsafe fn seek64(aasset: *mut AAsset, off: off64_t, whence: libc::c_int) -> off64_t {
+    let mut wanted_assets = WANTED_ASSETS.lock().unwrap();
+    let file = match wanted_assets.get_mut(&AAssetPtr(aasset)) {
+        Some(file) => file,
+        None => return ndk_sys::AAsset_seek64(aasset, off, whence),
+    };
+    seek_facade(off, whence, file) as off64_t
+}
+
+pub(crate) unsafe fn seek(aasset: *mut AAsset, off: off_t, whence: libc::c_int) -> off_t {
+    let mut wanted_assets = WANTED_ASSETS.lock().unwrap();
+    let file = match wanted_assets.get_mut(&AAssetPtr(aasset)) {
+        Some(file) => file,
+        None => return ndk_sys::AAsset_seek(aasset, off, whence),
+    };
+    seek_facade(off.into(), whence, file) as off_t
+}
+
+pub(crate) unsafe fn read(
+    aasset: *mut AAsset,
+    buf: *mut libc::c_void,
+    count: libc::size_t,
+) -> libc::c_int {
+    let mut wanted_assets = WANTED_ASSETS.lock().unwrap();
+    let file = match wanted_assets.get_mut(&AAssetPtr(aasset)) {
+        Some(file) => file,
+        None => return ndk_sys::AAsset_read(aasset, buf, count),
+    };
+    let rs_buffer = core::slice::from_raw_parts_mut(buf as *mut u8, count);
+    let read_total = match file.read(rs_buffer) {
+        Ok(n) => n,
+        Err(e) => {
+            log::warn!("failed fake aaset read: {e}");
+            return -1 as libc::c_int;
+        }
+    };
+    read_total as libc::c_int
+}
+
+pub(crate) unsafe fn len(aasset: *mut AAsset) -> off_t {
+    let wanted_assets = WANTED_ASSETS.lock().unwrap();
+    let file = match wanted_assets.get(&AAssetPtr(aasset)) {
+        Some(file) => file,
+        None => return ndk_sys::AAsset_getLength(aasset),
+    };
+    file.get_ref().len() as off_t
+}
+
+pub(crate) unsafe fn len64(aasset: *mut AAsset) -> off64_t {
+    let wanted_assets = WANTED_ASSETS.lock().unwrap();
+    let file = match wanted_assets.get(&AAssetPtr(aasset)) {
+        Some(file) => file,
+        None => return ndk_sys::AAsset_getLength64(aasset),
+    };
+    file.get_ref().len() as off64_t
+}
+
+pub(crate) unsafe fn rem(aasset: *mut AAsset) -> off_t {
+    let wanted_assets = WANTED_ASSETS.lock().unwrap();
+    let file = match wanted_assets.get(&AAssetPtr(aasset)) {
+        Some(file) => file,
+        None => return ndk_sys::AAsset_getRemainingLength(aasset),
+    };
+    (file.get_ref().len() - file.position() as usize) as off_t
+}
+
+pub(crate) unsafe fn rem64(aasset: *mut AAsset) -> off64_t {
+    let wanted_assets = WANTED_ASSETS.lock().unwrap();
+    let file = match wanted_assets.get(&AAssetPtr(aasset)) {
+        Some(file) => file,
+        None => return ndk_sys::AAsset_getRemainingLength64(aasset),
+    };
+    (file.get_ref().len() - file.position() as usize) as off64_t
+}
+
+pub(crate) unsafe fn close(aasset: *mut AAsset) {
+    let mut wanted_assets = WANTED_ASSETS.lock().unwrap();
+    if wanted_assets.remove(&AAssetPtr(aasset)).is_none() {
+        ndk_sys::AAsset_close(aasset);
+    }
+}
+
+pub(crate) unsafe fn get_buffer(aasset: *mut AAsset) -> *const libc::c_void {
+    let mut wanted_assets = WANTED_ASSETS.lock().unwrap();
+    let file = match wanted_assets.get_mut(&AAssetPtr(aasset)) {
+        Some(file) => file,
+        None => return ndk_sys::AAsset_getBuffer(aasset),
+    };
+    file.get_mut().as_mut_ptr().cast()
+}
+
+pub(crate) unsafe fn fd_dummy(
+    aasset: *mut AAsset,
+    out_start: *mut off_t,
+    out_len: *mut off_t,
+) -> libc::c_int {
+    let wanted_assets = WANTED_ASSETS.lock().unwrap();
+    match wanted_assets.get(&AAssetPtr(aasset)) {
+        Some(_) => {
+            log::error!("WE GOT BUSTED NOOO");
+            -1
+        }
+        None => ndk_sys::AAsset_openFileDescriptor(aasset, out_start, out_len),
+    }
+}
+
+pub(crate) unsafe fn fd_dummy64(
+    aasset: *mut AAsset,
+    out_start: *mut off64_t,
+    out_len: *mut off64_t,
+) -> libc::c_int {
+    let wanted_assets = WANTED_ASSETS.lock().unwrap();
+    match wanted_assets.get(&AAssetPtr(aasset)) {
+        Some(_) => {
+            log::error!("WE GOT BUSTED NOOO");
+            -1
+        }
+        None => ndk_sys::AAsset_openFileDescriptor64(aasset, out_start, out_len),
+    }
+}
+
+pub(crate) unsafe fn is_alloc(aasset: *mut AAsset) -> libc::c_int {
+    let wanted_assets = WANTED_ASSETS.lock().unwrap();
+    match wanted_assets.get(&AAssetPtr(aasset)) {
+        Some(_) => false as libc::c_int,
+        None => ndk_sys::AAsset_isAllocated(aasset),
+    }
+}
+
+fn seek_facade(offset: i64, whence: libc::c_int, file: &mut Cursor<Vec<u8>>) -> i64 {
+    let offset = match whence {
+        libc::SEEK_SET => {
+            let u64_off = match u64::try_from(offset) {
+                Ok(uoff) => uoff,
+                Err(e) => {
+                    log::error!("signed ({offset}) to unsigned failed: {e}");
+                    return -1;
+                }
+            };
+            io::SeekFrom::Start(u64_off)
+        }
+        libc::SEEK_CUR => io::SeekFrom::Current(offset),
+        libc::SEEK_END => io::SeekFrom::End(offset),
+        _ => {
+            log::error!("Invalid seek whence");
+            return -1;
+        }
+    };
+    match file.seek(offset) {
+        Ok(new_offset) => match new_offset.try_into() {
+            Ok(int) => int,
+            Err(err) => {
+                log::error!("u64 ({new_offset}) to i64 failed: {err}");
+                -1
+            }
+        },
+        Err(err) => {
+            log::error!("aasset seek failed: {err}");
+            -1
+        }
+    }
 }"#;
 
 const CLASSIC_STEVE_TEXTURE: &[u8] = include_bytes!("s.png");
@@ -954,6 +1558,64 @@ fn is_mobs_json_file(c_path: &Path) -> bool {
     filename == "mobs.json"
 }
 
+fn is_player_animation_file(c_path: &Path) -> bool {
+    if !is_cape_physics_enabled() {
+        return false;
+    }
+    
+    let path_str = c_path.to_string_lossy();
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+    
+    if filename != "player.animation.json" {
+        return false;
+    }
+    
+    let animation_patterns = [
+        "animations/player.animation.json",
+        "/animations/player.animation.json",
+        "vanilla/animations/player.animation.json",
+        "/vanilla/animations/player.animation.json",
+        "resource_packs/vanilla/animations/player.animation.json",
+        "assets/resource_packs/vanilla/animations/player.animation.json",
+    ];
+    
+    animation_patterns.iter().any(|pattern| {
+        path_str.contains(pattern) || path_str.ends_with(pattern)
+    })
+}
+
+fn is_vanilla_contents_file(c_path: &Path) -> bool {
+    if !is_cape_physics_enabled() {
+        return false;
+    }
+    
+    let path_str = c_path.to_string_lossy();
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+    
+    if filename != "contents.json" {
+        return false;
+    }
+    
+    let contents_patterns = [
+        "vanilla/contents.json",
+        "/vanilla/contents.json",
+        "resource_packs/vanilla/contents.json",
+        "/resource_packs/vanilla/contents.json",
+        "assets/resource_packs/vanilla/contents.json",
+        "assets/vanilla/contents.json",
+    ];
+    
+    contents_patterns.iter().any(|pattern| {
+        path_str.contains(pattern) || path_str.ends_with(pattern)
+    })
+}
+
 // Improved custom cape texture loading with better error handling
 fn load_custom_cape_texture() -> Option<Vec<u8>> {
     match std::fs::read(CAPE_TEXTURE_PATH) {
@@ -991,27 +1653,138 @@ fn modify_mobs_json_remove_cape(original_data: &[u8]) -> Option<Vec<u8>> {
         }
     };
     
-    // Navigate to minecraft:client_entity -> description -> geometry
-    if let Some(client_entity) = json_value
-        .get_mut("minecraft:client_entity")
-        .and_then(|ce| ce.as_object_mut())
-    {
-        if let Some(description) = client_entity
-            .get_mut("description")
-            .and_then(|desc| desc.as_object_mut())
-        {
-            if let Some(geometry) = description
-                .get_mut("geometry")
-                .and_then(|geom| geom.as_object_mut())
-            {
-// Remove the cape geometry
-                if geometry.remove("cape").is_some() {
-                    log::info!("Removed geometry.cape from mobs.json");
-                } else {
-                    log::info!("geometry.cape not found in mobs.json");
-                }
-            }
+    // Remove the geometry.cape object directly from the root level
+    if let Some(obj) = json_value.as_object_mut() {
+        if obj.remove("geometry.cape").is_some() {
+            log::info!("Removed geometry.cape from mobs.json");
+        } else {
+            log::info!("geometry.cape not found in mobs.json");
         }
+    } else {
+        log::error!("mobs.json root is not an object");
+        return None;
+    }
+    
+    serde_json::to_string_pretty(&json_value)
+        .ok()
+        .map(|s| s.into_bytes())
+}
+
+fn modify_player_animation_remove_cape(original_data: &[u8]) -> Option<Vec<u8>> {
+    let json_str = match std::str::from_utf8(original_data) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("Failed to parse player.animation.json as UTF-8: {}", e);
+            return None;
+        }
+    };
+    
+    let mut json_value: Value = match serde_json::from_str(json_str) {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Failed to parse player.animation.json as JSON: {}", e);
+            return None;
+        }
+    };
+    
+    // Navigate to animations object and remove animation.player.cape
+    if let Some(obj) = json_value.as_object_mut() {
+        if let Some(animations) = obj.get_mut("animations").and_then(|a| a.as_object_mut()) {
+            if animations.remove("animation.player.cape").is_some() {
+                log::info!("Removed animation.player.cape from player.animation.json");
+            } else {
+                log::info!("animation.player.cape not found in player.animation.json");
+            }
+        } else {
+            log::error!("animations object not found in player.animation.json");
+            return None;
+        }
+    } else {
+        log::error!("player.animation.json root is not an object");
+        return None;
+    }
+    
+    serde_json::to_string_pretty(&json_value)
+        .ok()
+        .map(|s| s.into_bytes())
+}
+
+fn modify_vanilla_contents_add_cape_files(original_data: &[u8]) -> Option<Vec<u8>> {
+    let json_str = match std::str::from_utf8(original_data) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("Failed to parse vanilla/contents.json as UTF-8: {}", e);
+            return None;
+        }
+    };
+    
+    let mut json_value: Value = match serde_json::from_str(json_str) {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Failed to parse vanilla/contents.json as JSON: {}", e);
+            return None;
+        }
+    };
+    
+    // Navigate to content array and add cape files
+    if let Some(obj) = json_value.as_object_mut() {
+        if let Some(content) = obj.get_mut("content").and_then(|c| c.as_array_mut()) {
+            
+            // Check if cape.geo.json already exists
+            let cape_geo_exists = content.iter().any(|item| {
+                if let Some(path_obj) = item.as_object() {
+                    if let Some(path) = path_obj.get("path").and_then(|p| p.as_str()) {
+                        path == "models/entity/cape.geo.json"
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            });
+            
+            // Check if cape.animation.json already exists
+            let cape_animation_exists = content.iter().any(|item| {
+                if let Some(path_obj) = item.as_object() {
+                    if let Some(path) = path_obj.get("path").and_then(|p| p.as_str()) {
+                        path == "animations/cape.animation.json"
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            });
+            
+            // Add cape.geo.json if it doesn't exist
+            if !cape_geo_exists {
+                let cape_geo_entry = serde_json::json!({
+                    "path": "models/entity/cape.geo.json"
+                });
+                content.push(cape_geo_entry);
+                log::info!("Added models/entity/cape.geo.json to vanilla/contents.json");
+            } else {
+                log::info!("models/entity/cape.geo.json already exists in vanilla/contents.json");
+            }
+            
+            // Add cape.animation.json if it doesn't exist
+            if !cape_animation_exists {
+                let cape_animation_entry = serde_json::json!({
+                    "path": "animations/cape.animation.json"
+                });
+                content.push(cape_animation_entry);
+                log::info!("Added animations/cape.animation.json to vanilla/contents.json");
+            } else {
+                log::info!("animations/cape.animation.json already exists in vanilla/contents.json");
+            }
+            
+        } else {
+            log::error!("content array not found in vanilla/contents.json");
+            return None;
+        }
+    } else {
+        log::error!("vanilla/contents.json root is not an object");
+        return None;
     }
     
     serde_json::to_string_pretty(&json_value)
@@ -1103,572 +1876,6 @@ fn modify_player_entity_json(original_data: &[u8]) -> Option<Vec<u8>> {
         Err(e) => {
             log::error!("Failed to serialize modified player.entity.json: {}", e);
             None
-        }
-    }
-}
-
-pub(crate) unsafe fn open(
-    man: *mut AAssetManager,
-    fname: *const libc::c_char,
-    mode: libc::c_int,
-) -> *mut ndk_sys::AAsset {
-    let aasset = unsafe { ndk_sys::AAssetManager_open(man, fname, mode) };
-    let c_str = unsafe { CStr::from_ptr(fname) };
-    let raw_cstr = c_str.to_bytes();
-    let os_str = OsStr::from_bytes(raw_cstr);
-    let c_path: &Path = Path::new(os_str);
-    
-    let Some(os_filename) = c_path.file_name() else {
-        log::warn!("Path had no filename: {c_path:?}");
-        return aasset;
-    };
-
-    // Debug logging for client capes
-    if is_client_capes_enabled() {
-        let path_str = c_path.to_string_lossy();
-        if path_str.contains("cape") || path_str.contains("player.entity") {
-            log::info!("Client capes enabled - checking file: {}", c_path.display());
-        }
-    }
-    
-    // Debug logging for particles disabler
-    if is_particles_disabler_enabled() {
-        let path_str = c_path.to_string_lossy();
-        if path_str.contains("particle") || path_str.contains("effect") {
-            log::info!("Particles disabler enabled - checking file: {}", c_path.display());
-        }
-    }
-    
-    // Handle particles disabler - replace particle files with empty JSON
-    if is_particles_folder_to_block(c_path) {
-        log::info!("Replacing particles file with empty JSON due to particles_disabler enabled: {}", c_path.display());
-        let buffer = EMPTY_PARTICLE_JSON.as_bytes().to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-    
-    // Handle cape_invisible texture replacement
-    if is_cape_invisible_texture_file(c_path) {
-        log::info!("Intercepting cape_invisible texture with custom cape: {}", c_path.display());
-        
-        if let Some(custom_cape_data) = load_custom_cape_texture() {
-            let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-            wanted_lock.insert(AAssetPtr(aasset), Cursor::new(custom_cape_data));
-            return aasset;
-        } else {
-            log::warn!("Custom cape texture not found, blocking cape_invisible texture");
-            // Block the original cape_invisible texture if custom one isn't available
-            if !aasset.is_null() {
-                ndk_sys::AAsset_close(aasset);
-            }
-            return std::ptr::null_mut();
-        }
-    }
-
-    // Block persona files if classic skins enabled
-    if is_persona_file_to_block(c_path) {
-        log::info!("Blocking persona file due to classic_skins enabled: {}", c_path.display());
-        if !aasset.is_null() {
-            ndk_sys::AAsset_close(aasset);
-        }
-        return std::ptr::null_mut();
-    }
-
-    // Handle mobs.json cape removal for cape physics
-    if is_mobs_json_file(c_path) {
-        log::info!("Intercepting mobs.json to remove cape geometry (cape physics enabled): {}", c_path.display());
-        
-        // Read the original file first
-        if aasset.is_null() {
-            log::error!("Failed to open original mobs.json");
-            return aasset;
-        }
-        
-        let length = ndk_sys::AAsset_getLength(aasset) as usize;
-        if length == 0 {
-            log::error!("mobs.json has zero length");
-            return aasset;
-        }
-        
-        let mut original_data = vec![0u8; length];
-        let bytes_read = ndk_sys::AAsset_read(aasset, original_data.as_mut_ptr() as *mut libc::c_void, length);
-        
-        if bytes_read != length as i32 {
-            log::error!("Failed to read original mobs.json completely (read {}, expected {})", bytes_read, length);
-            return aasset;
-        }
-        
-        // Reset the asset position for normal operation
-        ndk_sys::AAsset_seek(aasset, 0, libc::SEEK_SET);
-        
-        if let Some(modified_data) = modify_mobs_json_remove_cape(&original_data) {
-            let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-            wanted_lock.insert(AAssetPtr(aasset), Cursor::new(modified_data));
-            return aasset;
-        } else {
-            log::warn!("Failed to modify mobs.json, using original");
-            return aasset;
-        }
-    }
-
-    // Handle cape.animation.json creation
-    if is_cape_animation_file(c_path) {
-        log::info!("Intercepting cape.animation.json with cape animation content: {}", c_path.display());
-        let buffer = CAPE_ANIMATION_JSON.as_bytes().to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-
-    // Handle cape.geo.json creation  
-    if is_cape_geo_file(c_path) {
-        log::info!("Intercepting cape.geo.json with cape geometry content: {}", c_path.display());
-        let buffer = CAPE_GEO_JSON.as_bytes().to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-    
-    // Handle player.entity.json modification
-    if is_player_entity_file(c_path) {
-        log::info!("Intercepting player.entity.json with client capes modification: {}", c_path.display());
-        
-        // Read the original file first
-        if aasset.is_null() {
-            log::error!("Failed to open original player.entity.json");
-            return aasset;
-        }
-        
-        let length = ndk_sys::AAsset_getLength(aasset) as usize;
-        if length == 0 {
-            log::error!("player.entity.json has zero length");
-            return aasset;
-        }
-        
-        let mut original_data = vec![0u8; length];
-        let bytes_read = ndk_sys::AAsset_read(aasset, original_data.as_mut_ptr() as *mut libc::c_void, length);
-        
-        if bytes_read != length as i32 {
-            log::error!("Failed to read original player.entity.json completely (read {}, expected {})", bytes_read, length);
-            return aasset;
-        }
-        
-        // Reset the asset position for normal operation
-        ndk_sys::AAsset_seek(aasset, 0, libc::SEEK_SET);
-        
-        if let Some(modified_data) = modify_player_entity_json(&original_data) {
-            let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-            wanted_lock.insert(AAssetPtr(aasset), Cursor::new(modified_data));
-            return aasset;
-        } else {
-            log::warn!("Failed to modify player.entity.json, using original");
-            return aasset;
-        }
-    }
-    
-    // Custom splashes
-    if os_filename == "splashes.json" {
-        log::info!("Intercepting splashes.json with custom content");
-        let buffer = CUSTOM_SPLASHES_JSON.as_bytes().to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-    
-    // Custom loading messages
-    if os_filename == "loading_messages.json" {
-        log::info!("Intercepting loading_messages.json with custom content");
-        let buffer = CUSTOM_LOADING_MESSAGES_JSON.as_bytes().to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-    
-    // Java clouds texture replacement
-    if is_clouds_texture_file(c_path) {
-        log::info!("Intercepting clouds texture with Java clouds texture: {}", c_path.display());
-        let buffer = JAVA_CLOUDS_TEXTURE.to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-
-    // Classic skins replacements
-    if is_classic_skins_steve_texture_file(c_path) {
-        log::info!("Intercepting steve.png with classic Steve texture: {}", c_path.display());
-        let buffer = CLASSIC_STEVE_TEXTURE.to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-    
-    if is_classic_skins_alex_texture_file(c_path) {
-        log::info!("Intercepting alex.png with classic Alex texture: {}", c_path.display());
-        let buffer = CLASSIC_ALEX_TEXTURE.to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-    
-    if is_classic_skins_json_file(c_path) {
-        log::info!("Intercepting skins.json with classic skins content: {}", c_path.display());
-        let buffer = CUSTOM_SKINS_JSON.as_bytes().to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-    
-    // Handle cape render controllers
-    if is_client_capes_file(c_path) {
-        log::info!("Intercepting cape render controller file with cape content: {}", c_path.display());
-        let buffer = RENDER_JSON.as_bytes().to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-    
-    if is_outline_material_file(c_path) {
-        log::info!("Intercepting ui3dmaterial file with new content: {}", c_path.display());
-        let buffer = CUSTOM_BLOCKOUTLINE.as_bytes().to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-    
-    // No hurt cam camera replacements
-    if is_no_hurt_cam_enabled() {
-        let path_str = c_path.to_string_lossy();
-        
-        if path_str.contains("cameras/") {
-            if os_filename == "first_person.json" {
-                log::info!("Intercepting cameras/first_person.json with custom content (nohurtcam enabled)");
-                let buffer = CUSTOM_FIRST_PERSON_JSON.as_bytes().to_vec();
-                let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-                wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-                return aasset;
-            }
-            
-            if os_filename == "third_person.json" {
-                log::info!("Intercepting cameras/third_person.json with custom content (nohurtcam enabled)");
-                let buffer = CUSTOM_THIRD_PERSON_JSON.as_bytes().to_vec();
-                let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-                wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-                return aasset;
-            }
-            
-            if os_filename == "third_person_front.json" {
-                log::info!("Intercepting cameras/third_person_front.json with custom content (nohurtcam enabled)");
-                let buffer = CUSTOM_THIRD_PERSON_FRONT_JSON.as_bytes().to_vec();
-                let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-                wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-                return aasset;
-            }
-        }
-    }
-
-    // Material replacements
-    let filename_str = os_filename.to_string_lossy();
-    if let Some(no_fog_data) = get_no_fog_material_data(&filename_str) {
-        log::info!("Intercepting {} with no-fog material (no-fog enabled)", filename_str);
-        let buffer = no_fog_data.to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-    
-    if let Some(night_vision_data) = get_nightvision_material_data(&filename_str) {
-        log::info!("Intercepting {} with night-vision material (night-vision enabled)", filename_str);
-        let buffer = night_vision_data.to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-    
-    if let Some(java_cubemap_data) = get_java_cubemap_material_data(&filename_str) {
-        log::info!("Intercepting {} with java-cubemap material (java-cubemap enabled)", filename_str);
-        let buffer = java_cubemap_data.to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-    
-    if let Some(title_png_data) = get_title_png_data(&filename_str) {
-        log::info!("Intercepting {} with xelo title png (xelo-title enabled)", filename_str);
-        let buffer = title_png_data.to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-
-    // Resource pack loading logic
-    let stripped = match c_path.strip_prefix("assets/") {
-        Ok(yay) => yay,
-        Err(_e) => c_path,
-    };
-    
-    let replacement_list = folder_list! {
-        apk: "gui/dist/hbui/" -> pack: "hbui/",
-        apk: "skin_packs/persona/" -> pack: "persona/",
-        apk: "renderer/" -> pack: "renderer/",
-        apk: "resource_packs/vanilla/cameras/" -> pack: "vanilla_cameras/",
-    };
-    
-    for replacement in replacement_list {
-        if let Ok(file) = stripped.strip_prefix(replacement.0) {
-            cxx::let_cxx_string!(cxx_out = "");
-            let loadfn = match crate::RPM_LOAD.get() {
-                Some(ptr) => ptr,
-                None => {
-                    log::warn!("ResourcePackManager fn is not ready yet?");
-                    return aasset;
-                }
-            };
-            let mut arraybuf = [0; 128];
-            let file_path = opt_path_join(&mut arraybuf, &[Path::new(replacement.1), file]);
-            let packm_ptr = crate::PACKM_OBJ.load(std::sync::atomic::Ordering::Acquire);
-            let resource_loc = ResourceLocation::from_str(file_path.as_ref());
-            log::info!("loading rpck file: {:#?}", &file_path);
-            if packm_ptr.is_null() {
-                log::error!("ResourcePackManager ptr is null");
-                return aasset;
-            }
-            loadfn(packm_ptr, resource_loc, cxx_out.as_mut());
-            if cxx_out.is_empty() {
-                log::info!("File was not found");
-                return aasset;
-            }
-            let buffer = if os_filename.as_encoded_bytes().ends_with(b".material.bin") {
-                match process_material(man, cxx_out.as_bytes()) {
-                    Some(updated) => updated,
-                    None => cxx_out.as_bytes().to_vec(),
-                }
-            } else {
-                cxx_out.as_bytes().to_vec()
-            };
-            let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-            wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-            return aasset;
-        }
-    }
-    return aasset;
-}
-
-fn opt_path_join<'a>(bytes: &'a mut [u8; 128], paths: &[&Path]) -> Cow<'a, CStr> {
-    let total_len: usize = paths.iter().map(|p| p.as_os_str().len()).sum();
-    if total_len + 1 > 128 {
-        let mut pathbuf = PathBuf::new();
-        for path in paths {
-            pathbuf.push(path);
-        }
-        let cpath = CString::new(pathbuf.into_os_string().as_encoded_bytes()).unwrap();
-        return Cow::Owned(cpath);
-    }
-
-    let mut writer = bytes.as_mut_slice();
-    for path in paths {
-        let osstr = path.as_os_str().as_bytes();
-        let _ = writer.write(osstr);
-    }
-    let _ = writer.write(&[0]);
-    let guh = CStr::from_bytes_until_nul(bytes).unwrap();
-    Cow::Borrowed(guh)
-}
-
-fn process_material(man: *mut AAssetManager, data: &[u8]) -> Option<Vec<u8>> {
-    let mcver = MC_VERSION.get_or_init(|| {
-        let pointer = match std::ptr::NonNull::new(man) {
-            Some(yay) => yay,
-            None => {
-                log::warn!("AssetManager is null?, preposterous, mc detection failed");
-                return None;
-            }
-        };
-        let manager = unsafe { ndk::asset::AssetManager::from_ptr(pointer) };
-        get_current_mcver(manager)
-    });
-    let mcver = (*mcver)?;
-    for version in materialbin::ALL_VERSIONS {
-        let material: CompiledMaterialDefinition = match data.pread_with(0, version) {
-            Ok(data) => data,
-            Err(e) => {
-                log::trace!("[version] Parsing failed: {e}");
-                continue;
-            }
-        };
-        if version == mcver {
-            return None;
-        }
-        let mut output = Vec::with_capacity(data.len());
-        if let Err(e) = material.write(&mut output, mcver) {
-            log::trace!("[version] Write error: {e}");
-            return None;
-        }
-        return Some(output);
-    }
-
-    None
-}
-
-pub(crate) unsafe fn seek64(aasset: *mut AAsset, off: off64_t, whence: libc::c_int) -> off64_t {
-    let mut wanted_assets = WANTED_ASSETS.lock().unwrap();
-    let file = match wanted_assets.get_mut(&AAssetPtr(aasset)) {
-        Some(file) => file,
-        None => return ndk_sys::AAsset_seek64(aasset, off, whence),
-    };
-    seek_facade(off, whence, file) as off64_t
-}
-
-pub(crate) unsafe fn seek(aasset: *mut AAsset, off: off_t, whence: libc::c_int) -> off_t {
-    let mut wanted_assets = WANTED_ASSETS.lock().unwrap();
-    let file = match wanted_assets.get_mut(&AAssetPtr(aasset)) {
-        Some(file) => file,
-        None => return ndk_sys::AAsset_seek(aasset, off, whence),
-    };
-    seek_facade(off.into(), whence, file) as off_t
-}
-
-pub(crate) unsafe fn read(
-    aasset: *mut AAsset,
-    buf: *mut libc::c_void,
-    count: libc::size_t,
-) -> libc::c_int {
-    let mut wanted_assets = WANTED_ASSETS.lock().unwrap();
-    let file = match wanted_assets.get_mut(&AAssetPtr(aasset)) {
-        Some(file) => file,
-        None => return ndk_sys::AAsset_read(aasset, buf, count),
-    };
-    let rs_buffer = core::slice::from_raw_parts_mut(buf as *mut u8, count);
-    let read_total = match file.read(rs_buffer) {
-        Ok(n) => n,
-        Err(e) => {
-            log::warn!("failed fake aaset read: {e}");
-            return -1 as libc::c_int;
-        }
-    };
-    read_total as libc::c_int
-}
-
-pub(crate) unsafe fn len(aasset: *mut AAsset) -> off_t {
-    let wanted_assets = WANTED_ASSETS.lock().unwrap();
-    let file = match wanted_assets.get(&AAssetPtr(aasset)) {
-        Some(file) => file,
-        None => return ndk_sys::AAsset_getLength(aasset),
-    };
-    file.get_ref().len() as off_t
-}
-
-pub(crate) unsafe fn len64(aasset: *mut AAsset) -> off64_t {
-    let wanted_assets = WANTED_ASSETS.lock().unwrap();
-    let file = match wanted_assets.get(&AAssetPtr(aasset)) {
-        Some(file) => file,
-        None => return ndk_sys::AAsset_getLength64(aasset),
-    };
-    file.get_ref().len() as off64_t
-}
-
-pub(crate) unsafe fn rem(aasset: *mut AAsset) -> off_t {
-    let wanted_assets = WANTED_ASSETS.lock().unwrap();
-    let file = match wanted_assets.get(&AAssetPtr(aasset)) {
-        Some(file) => file,
-        None => return ndk_sys::AAsset_getRemainingLength(aasset),
-    };
-    (file.get_ref().len() - file.position() as usize) as off_t
-}
-
-pub(crate) unsafe fn rem64(aasset: *mut AAsset) -> off64_t {
-    let wanted_assets = WANTED_ASSETS.lock().unwrap();
-    let file = match wanted_assets.get(&AAssetPtr(aasset)) {
-        Some(file) => file,
-        None => return ndk_sys::AAsset_getRemainingLength64(aasset),
-    };
-    (file.get_ref().len() - file.position() as usize) as off64_t
-}
-
-pub(crate) unsafe fn close(aasset: *mut AAsset) {
-    let mut wanted_assets = WANTED_ASSETS.lock().unwrap();
-    if wanted_assets.remove(&AAssetPtr(aasset)).is_none() {
-        ndk_sys::AAsset_close(aasset);
-    }
-}
-
-pub(crate) unsafe fn get_buffer(aasset: *mut AAsset) -> *const libc::c_void {
-    let mut wanted_assets = WANTED_ASSETS.lock().unwrap();
-    let file = match wanted_assets.get_mut(&AAssetPtr(aasset)) {
-        Some(file) => file,
-        None => return ndk_sys::AAsset_getBuffer(aasset),
-    };
-    file.get_mut().as_mut_ptr().cast()
-}
-
-pub(crate) unsafe fn fd_dummy(
-    aasset: *mut AAsset,
-    out_start: *mut off_t,
-    out_len: *mut off_t,
-) -> libc::c_int {
-    let wanted_assets = WANTED_ASSETS.lock().unwrap();
-    match wanted_assets.get(&AAssetPtr(aasset)) {
-        Some(_) => {
-            log::error!("WE GOT BUSTED NOOO");
-            -1
-        }
-        None => ndk_sys::AAsset_openFileDescriptor(aasset, out_start, out_len),
-    }
-}
-
-pub(crate) unsafe fn fd_dummy64(
-    aasset: *mut AAsset,
-    out_start: *mut off64_t,
-    out_len: *mut off64_t,
-) -> libc::c_int {
-    let wanted_assets = WANTED_ASSETS.lock().unwrap();
-    match wanted_assets.get(&AAssetPtr(aasset)) {
-        Some(_) => {
-            log::error!("WE GOT BUSTED NOOO");
-            -1
-        }
-        None => ndk_sys::AAsset_openFileDescriptor64(aasset, out_start, out_len),
-    }
-}
-
-pub(crate) unsafe fn is_alloc(aasset: *mut AAsset) -> libc::c_int {
-    let wanted_assets = WANTED_ASSETS.lock().unwrap();
-    match wanted_assets.get(&AAssetPtr(aasset)) {
-        Some(_) => false as libc::c_int,
-        None => ndk_sys::AAsset_isAllocated(aasset),
-    }
-}
-
-fn seek_facade(offset: i64, whence: libc::c_int, file: &mut Cursor<Vec<u8>>) -> i64 {
-    let offset = match whence {
-        libc::SEEK_SET => {
-            let u64_off = match u64::try_from(offset) {
-                Ok(uoff) => uoff,
-                Err(e) => {
-                    log::error!("signed ({offset}) to unsigned failed: {e}");
-                    return -1;
-                }
-            };
-            io::SeekFrom::Start(u64_off)
-        }
-        libc::SEEK_CUR => io::SeekFrom::Current(offset),
-        libc::SEEK_END => io::SeekFrom::End(offset),
-        _ => {
-            log::error!("Invalid seek whence");
-            return -1;
-        }
-    };
-    match file.seek(offset) {
-        Ok(new_offset) => match new_offset.try_into() {
-            Ok(int) => int,
-            Err(err) => {
-                log::error!("u64 ({new_offset}) to i64 failed: {err}");
-                -1
-            }
-        },
-        Err(err) => {
-            log::error!("aasset seek failed: {err}");
-            -1
         }
     }
 }
