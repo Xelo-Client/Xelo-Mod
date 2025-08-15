@@ -36,6 +36,9 @@ pub struct ModConfig {
     #[serde(rename = "xelo_title")]
     pub xelo_title: bool,
     
+    #[serde(rename = "entity_culling")]
+    pub entity_culling: bool,
+    
     #[serde(rename = "client_capes")]
     pub client_capes: bool,
     
@@ -59,6 +62,7 @@ impl Default for ModConfig {
             night_vision: false,
             xelo_title: true,
             client_capes: false,
+            entity_culling: false,
             white_block_outline: false,
         }
     }
@@ -169,6 +173,9 @@ pub fn is_client_capes_enabled() -> bool {
     get_config().client_capes
 }
 
+pub fn is_entity_culling_enabled() -> bool {
+    get_config().entity_culling
+}
 pub fn is_block_whiteoutline_enabled() -> bool {
     get_config().white_block_outline
 }
