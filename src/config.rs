@@ -44,6 +44,9 @@ pub struct ModConfig {
     
     #[serde(rename = "white_block_outline")]
     pub white_block_outline: bool,
+    
+    #[serde(rename = "side_shield")]
+    pub side_shield: bool,
     // You can add more fields as needed
     // #[serde(rename = "CustomField")]
     // pub custom_field: bool,
@@ -52,17 +55,17 @@ pub struct ModConfig {
 impl Default for ModConfig {
     fn default() -> Self {
         Self {
-            no_hurt_cam: true,
+            no_hurt_cam: false,
             no_fog: false,
             particles_disabler: false,
             java_clouds: false,
             java_cubemap: false,
             classic_skins: false,
-            cape_physics: false,
             night_vision: false,
             xelo_title: true,
             client_capes: false,
             entity_culling: false,
+            side_shield: false,
             white_block_outline: false,
         }
     }
@@ -157,10 +160,6 @@ pub fn is_classic_skins_enabled() -> bool {
     get_config().classic_skins
 }
 
-pub fn is_cape_physics_enabled() -> bool {
-    get_config().cape_physics
-}
-
 pub fn is_night_vision_enabled() -> bool {
     get_config().night_vision
 }
@@ -178,6 +177,9 @@ pub fn is_entity_culling_enabled() -> bool {
 }
 pub fn is_block_whiteoutline_enabled() -> bool {
     get_config().white_block_outline
+}
+pub fn is_side_shield_enabled() -> bool {
+    get_config().side_shield
 }
 
 // You can add more helper functions for other config values
