@@ -924,12 +924,27 @@ fn is_mobs_json_file(c_path: &Path) -> bool {
         return false;
     }
     
+    let path_str = c_path.to_string_lossy();
     let filename = match c_path.file_name() {
         Some(name) => name.to_string_lossy(),
         None => return false,
     };
     
-    filename == "mobs.json"
+    if filename != "mobs.json" {
+        return false;
+    }
+    
+    let mobs_patterns = [
+        "/models/mobs.json",
+        "vanilla/models/mobs.json",
+        "/vanilla/models/mobs.json",
+        "resource_packs/vanilla/models/mobs.json",
+        "assets/resource_packs/vanilla/models/mobs.json",
+    ];
+    
+    mobs_patterns.iter().any(|pattern| {
+        path_str.contains(pattern) || path_str.ends_with(pattern)
+    })
 }
 
 fn is_player_animation_file(c_path: &Path) -> bool {
