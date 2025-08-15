@@ -199,7 +199,7 @@ fn is_particles_folder_to_block(c_path: &Path) -> bool {
     
     let particle_files = [
         "arrowspell.json",
-        "balloon_gas.json",
+        "balloon_gas.json", 
         "basic_bubble.json",
         "basic_bubble_manual.json",
         "basic_crit.json",
