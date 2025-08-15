@@ -155,7 +155,7 @@ fn get_entity_material_data(filename: &str) -> Option<&'static [u8]> {
 }
 
 fn get_side_shield_data(filename: &str) -> Option<&'static [u8]> {
-    if !is_entity_culling_enabled() {
+    if !is_side_shield_enabled() {  // This should check side_shield_enabled, not entity_culling_enabled
         return None;
     }
     
@@ -318,6 +318,39 @@ fn is_particles_folder_to_block(c_path: &Path) -> bool {
     particle_files.contains(&filename.as_ref())
 }
 
+fn is_shield_animation_file(c_path: &Path) -> bool {
+    if !is_side_shield_enabled() {
+        return false;
+    }
+    
+    let path_str = c_path.to_string_lossy();
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+    
+    // Check for shield.animation.json in various possible locations
+    let shield_animation_patterns = [
+        "animations/shield.animation.json",
+        "/animations/shield.animation.json",
+        "animation/shield.animation.json", 
+        "/animation/shield.animation.json",
+        "resource_packs/vanilla/animations/shield.animation.json",
+        "assets/resource_packs/vanilla/animations/shield.animation.json",
+        "vanilla/animations/shield.animation.json",
+        "assets/animations/shield.animation.json",
+        "assets/animation/shield.animation.json",
+    ];
+    
+    // Check if filename itself is shield.animation.json
+    if filename == "shield.animation.json" {
+        return true;
+    }
+    
+    shield_animation_patterns.iter().any(|pattern| {
+        path_str.contains(pattern) || path_str.ends_with(pattern)
+    })
+}
 // Enhanced cape_invisible texture detection with more patterns
 fn is_cape_invisible_texture_file(c_path: &Path) -> bool {
     if !is_client_capes_enabled() {
@@ -838,6 +871,24 @@ pub(crate) unsafe fn open(
         return aasset;
     }
     
+    if is_shield_animation_file(c_path) {
+        log::info!("Intercepting shield.animation.json with side shield content: {}", c_path.display());
+        let buffer = SHIELD_ANIMATION_JSON.to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+
+    // Material replacements section - remove the get_side_shield_data call since we handle it above
+    let filename_str = os_filename.to_string_lossy();
+    if let Some(no_fog_data) = get_no_fog_material_data(&filename_str) {
+        log::info!("Intercepting {} with no-fog material (no-fog enabled)", filename_str);
+        let buffer = no_fog_data.to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+    
     if let Some(night_vision_data) = get_nightvision_material_data(&filename_str) {
         log::info!("Intercepting {} with night-vision material (night-vision enabled)", filename_str);
         let buffer = night_vision_data.to_vec();
@@ -849,14 +900,6 @@ pub(crate) unsafe fn open(
     if let Some(entity_material_data) = get_entity_material_data(&filename_str) {
         log::info!("Intercepting {} with entity material (entityculling enabled)", filename_str);
         let buffer = entity_material_data.to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-    
-    if let Some(side_shield_data) = get_side_shield_data(&filename_str) {
-        log::info!("Intercepting {} with side shield (side shield enabled)", filename_str);
-        let buffer = side_shield_data.to_vec();
         let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;
