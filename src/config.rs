@@ -27,9 +27,6 @@ pub struct ModConfig {
     #[serde(rename = "classic_skins")]
     pub classic_skins: bool,
     
-    #[serde(rename = "cape_physics")]
-    pub cape_physics: bool,
-    
     #[serde(rename = "night_vision")]
     pub night_vision: bool,
     
