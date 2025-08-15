@@ -35,7 +35,7 @@ const TITLE_PNG: &[u8] = include_bytes!("minecraft_title_5.png");
 
 const RENDER_CHUNK_NV_MATERIAL_BIN: &[u8] = include_bytes!("nightvision_materials/RenderChunk.material.bin");
 
-const ENTITY_CULLING: &[u8] = include_bytes!("entityculling/entity.material");
+const ENTITY_MATERIAL: &[u8] = include_bytes!("entityculling/entity.material");
 
 const CAPE_ANIMATION_JSON: &str = r#"{
 	"format_version": "1.8.0",
