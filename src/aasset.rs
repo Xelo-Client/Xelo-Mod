@@ -154,15 +154,37 @@ fn get_entity_material_data(filename: &str) -> Option<&'static [u8]> {
     }
 }
 
-fn get_side_shield_data(filename: &str) -> Option<&'static [u8]> {
+fn is_side_shield_animation_file(c_path: &Path) -> bool {
     if !is_side_shield_enabled() {
-        return None;
+        return false;
     }
     
-    match filename {
-        "shield.animation.json" => Some(SHIELD_ANIMATION_JSON),
-        _ => None,
+    let path_str = c_path.to_string_lossy();
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+    
+    // Must be exactly shield.animation.json
+    if filename != "shield.animation.json" {
+        return false;
     }
+    
+    // Check if it's in valid animation locations
+    let shield_animation_patterns = [
+        "animations/shield.animation.json",
+        "/animations/shield.animation.json",
+        "resource_packs/vanilla/animations/shield.animation.json",
+        "assets/resource_packs/vanilla/animations/shield.animation.json",
+        "vanilla/animations/shield.animation.json",
+        "assets/animations/shield.animation.json",
+        "entity/shield.animation.json",
+        "/entity/shield.animation.json",
+    ];
+    
+    shield_animation_patterns.iter().any(|pattern| {
+        path_str.contains(pattern) || path_str.ends_with(pattern)
+    })
 }
 
 fn get_java_cubemap_material_data(filename: &str) -> Option<&'static [u8]> {
@@ -854,13 +876,13 @@ pub(crate) unsafe fn open(
         return aasset;
     }
     
-    if let Some(side_shield_data) = get_side_shield_data(&filename_str) {
-        log::info!("Intercepting {} with side shield (side shield enabled)", filename_str);
-        let buffer = side_shield_data.to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
+    if is_side_shield_animation_file(c_path) {
+    log::info!("Intercepting shield animation with side shield animation: {}", c_path.display());
+    let buffer = SHIELD_ANIMATION_JSON.to_vec();
+    let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+    wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+    return aasset;
+}
     
     if let Some(java_cubemap_data) = get_java_cubemap_material_data(&filename_str) {
         log::info!("Intercepting {} with java-cubemap material (java-cubemap enabled)", filename_str);
