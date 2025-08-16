@@ -37,6 +37,8 @@ const RENDER_CHUNK_NV_MATERIAL_BIN: &[u8] = include_bytes!("utils/nightvision_ma
 
 const SHADOWS_MATERIAL: &[u8] = include_bytes!("optimizers/noshadows/shadows.material");
 
+const COMMON_JSON: &[u8] = include_bytes!("optimizers/noparticles/common.json");
+
 const CUSTOM_SPLASHES_JSON: &str = r#"{"splashes":["Xelo Client","Xelo > any other client","The Best Client!!","BlueCat","Xelo is so much better","Xelo Optimizes like no other client","Make Sure to star our repository:https://github.com/Xelo-Client/Xelo","Contributions open!","Made by the community, for the community","Yami is goated!!"]}"#;
 
 const CUSTOM_FIRST_PERSON_JSON: &str = r#"{"format_version":"1.18.10","minecraft:camera_entity":{"description":{"identifier":"minecraft:first_person"},"components":{"minecraft:camera":{"field_of_view":66,"near_clipping_plane":0.025,"far_clipping_plane":2500},"minecraft:camera_first_person":{},"minecraft:camera_render_first_person_objects":{},"minecraft:camera_attach_to_player":{},"minecraft:camera_offset":{"view":[0,0],"entity":[0,0,0]},"minecraft:camera_direct_look":{"pitch_min":-89.9,"pitch_max":89.9},"minecraft:camera_perspective_option":{"view_mode":"first_person"},"minecraft:update_player_from_camera":{"look_mode":"along_camera"},"minecraft:extend_player_rendering":{},"minecraft:camera_player_sleep_vignette":{},"minecraft:vr_comfort_move":{},"minecraft:default_input_camera":{},"minecraft:gameplay_affects_fov":{},"minecraft:allow_inside_block":{}}}}"#;
@@ -185,6 +187,37 @@ fn is_no_flipbook_animations_file(c_path: &Path) -> bool {
     })
 }
 
+fn is_particles_disabler_file(c_path: &Path) -> bool {
+    if !is_particles_disabler_enabled() {
+        return false;
+    }
+    
+    let path_str = c_path.to_string_lossy();
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+    
+    // Must be exactly flipbook_textures.json
+    if filename != "common.json" {
+        return false;
+    }
+    
+    // Check if it's in valid animation locations
+    let common_json_patterns = [
+        "materials/common.json",
+        "/materials/common.json",
+        "resource_packs/vanilla/materials/common.json",
+        "assets/resource_packs/vanilla/materials/common.json",
+        "vanilla/materials/common.json",
+        "assets/materials/common.json",
+    ];
+    
+    common_json_patterns.iter().any(|pattern| {
+        path_str.contains(pattern) || path_str.ends_with(pattern)
+    })
+}
+
 fn get_java_cubemap_material_data(filename: &str) -> Option<&'static [u8]> {
     if !is_java_cubemap_enabled() {
         return None;
@@ -205,137 +238,6 @@ fn get_title_png_data(filename: &str) -> Option<&'static [u8]> {
         "title.png" => Some(TITLE_PNG),
         _ => None,
     }
-}
-
-fn is_particles_folder_to_block(c_path: &Path) -> bool {
-    if !is_particles_disabler_enabled() {
-        return false;
-    }
-    
-    let filename = match c_path.file_name() {
-        Some(name) => name.to_string_lossy(),
-        None => return false,
-    };
-    
-    let particle_files = [
-        "arrowspell.json",
-        "balloon_gas.json",
-        "basic_bubble.json",
-        "basic_bubble_manual.json",
-        "basic_crit.json",
-        "basic_flame.json",
-        "basic_portal.json",
-        "basic_smoke.json",
-        "bleach.json",
-        "block_destruct.json",
-        "breaking_item_icon.json",
-        "breaking_item_terrain.json",
-        "bubble_column_bubble.json",
-        "bubble_column_down.json",
-        "bubble_column_up.json",
-        "camera_shoot_explosion.json",
-        "campfire_smoke.json",
-        "campfire_smoke_tall.json",
-        "cauldron_bubble.json",
-        "cauldron_splash.json",
-        "cauldronspell.json",
-        "colored_flame.json",
-        "conduit.json",
-        "conduit_absorb.json",
-        "conduit_attack.json",
-        "critical_hit.json",
-        "dolphin_move.json",
-        "dragon_breath_fire.json",
-        "dragon_breath_lingering.json",
-        "dragon_breath_trail.json",
-        "dragon_death_explosion.json",
-        "dragon_destroy_block.json",
-        "dragon_dying_explosion.json",
-        "enchanting_table_particle.json",
-        "end_chest.json",
-        "endrod.json",
-        "evaporation_elephant_toothpaste.json",
-        "evocation_fang.json",
-        "evoker_spell.json",
-        "explosion_cauldron.json",
-        "explosion_death.json",
-        "explosion_egg_destroy.json",
-        "explosion_eyeofender_death.json",
-        "explosion_labtable_fire.json",
-        "explosion_level.json",
-        "explosion_manual.json",
-        "eye_of_ender_bubble.json",
-        "falling_border_dust.json",
-        "falling_dust.json",
-        "falling_dust_concrete_powder.json",
-        "falling_dust_dragon_egg.json",
-        "falling_dust_gravel.json",
-        "falling_dust_red_sand.json",
-        "falling_dust_sand.json",
-        "falling_dust_scaffolding.json",
-        "falling_dust_top_snow.json",
-        "fish_hook.json",
-        "fish_pos.json",
-        "guardian_attack.json",
-        "guardian_water_move.json",
-        "heart.json",
-        "huge_explosion_lab_misc.json",
-        "huge_explosion_level.json",
-        "ice_evaporation.json",
-        "ink.json",
-        "knockback_roar.json",
-        "lab_table_heatblock_dust.json",
-        "lab_table_misc_mystical.json",
-        "large_explosion_level.json",
-        "lava_drip.json",
-        "lava_particle.json",
-        "llama_spit.json",
-        "magnesium_salts.json",
-        "mob_block_spawn.json",
-        "mob_portal.json",
-        "mobflame.json",
-        "mobflame_single.json",
-        "mobspell.json",
-        "mycelium_dust.json",
-        "note.json",
-        "obsidian_glow_dust.json",
-        "phantom_trail.json",
-        "portal_directional.json",
-        "portal_east_west.json",
-        "portal_north_south.json",
-        "rain_splash.json",
-        "redstone_ore_dust.json",
-        "redstone_repeater_dust.json",
-        "redstone_torch_dust.json",
-        "redstone_wire_dust.json",
-        "rising_border_dust.json",
-        "shulker_bullet.json",
-        "silverfish_grief.json",
-        "sneeze.json",
-        "sparkler.json",
-        "splashpotionspell.json",
-        "sponge_absorb_bubble.json",
-        "squid_flee.json",
-        "squid_ink_bubble.json",
-        "squid_move.json",
-        "stunned.json",
-        "totem.json",
-        "totem_manual.json",
-        "underwater_torch_bubble.json",
-        "villager_angry.json",
-        "villager_happy.json",
-        "water_drip.json",
-        "water_evaporation_actor.json",
-        "water_evaporation_bucket.json",
-        "water_evaporation_manual.json",
-        "water_splash.json",
-        "water_splash_manual.json",
-        "water_wake.json",
-        "witchspell.json",
-        "wither_boss_invulnerable.json",
-    ];
-    
-    particle_files.contains(&filename.as_ref())
 }
 
 // Enhanced cape_invisible texture detection with more patterns
@@ -666,13 +568,6 @@ pub(crate) unsafe fn open(
         }
     }
     
-    // Debug logging for particles disabler
-    if is_particles_disabler_enabled() {
-        let path_str = c_path.to_string_lossy();
-        if path_str.contains("particle") || path_str.contains("effect") {
-            log::info!("Particles disabler enabled - checking file: {}", c_path.display());
-        }
-    }
     
     // Handle cape_invisible texture replacement
     if is_cape_invisible_texture_file(c_path) {
@@ -695,15 +590,6 @@ pub(crate) unsafe fn open(
     // Block persona files if classic skins enabled
     if is_persona_file_to_block(c_path) {
         log::info!("Blocking persona file due to classic_skins enabled: {}", c_path.display());
-        if !aasset.is_null() {
-            ndk_sys::AAsset_close(aasset);
-        }
-        return std::ptr::null_mut();
-    }
-
-    // Block entire particles folder if particles disabler enabled
-    if is_particles_folder_to_block(c_path) {
-        log::info!("Blocking particles file due to particles_disabler enabled: {}", c_path.display());
         if !aasset.is_null() {
             ndk_sys::AAsset_close(aasset);
         }
@@ -877,6 +763,14 @@ pub(crate) unsafe fn open(
     if is_no_flipbook_animations_file(c_path) {
     log::info!("Intercepting shield animation with side shield animation: {}", c_path.display());
     let buffer = FLIPBOOK_ANIMATION_JSON.to_vec();
+    let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+    wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+    return aasset;
+}
+
+if is_particles_disabler_file(c_path) {
+    log::info!("Intercepting common json with no particles: {}", c_path.display());
+    let buffer = COMMON_JSON.to_vec();
     let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
     wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
     return aasset;
