@@ -42,8 +42,8 @@ pub struct ModConfig {
     #[serde(rename = "white_block_outline")]
     pub white_block_outline: bool,
     
-    #[serde(rename = "side_shield")]
-    pub side_shield: bool,
+    #[serde(rename = "no_flipbook_animations")]
+    pub no_flipbook_animations: bool,
     // You can add more fields as needed
     // #[serde(rename = "CustomField")]
     // pub custom_field: bool,
@@ -62,7 +62,7 @@ impl Default for ModConfig {
             xelo_title: true,
             client_capes: false,
             entity_culling: false,
-            side_shield: false,
+            no_flipbook_animations: false,
             white_block_outline: false,
         }
     }
@@ -175,8 +175,8 @@ pub fn is_entity_culling_enabled() -> bool {
 pub fn is_block_whiteoutline_enabled() -> bool {
     get_config().white_block_outline
 }
-pub fn is_side_shield_enabled() -> bool {
-    get_config().side_shield
+pub fn is_no_flipbook_animations_enabled() -> bool {
+    get_config().no_flipbook_animations
 }
 
 // You can add more helper functions for other config values
