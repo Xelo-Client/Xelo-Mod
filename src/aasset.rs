@@ -1,5 +1,5 @@
 use crate::ResourceLocation;
-use crate::config::{is_no_hurt_cam_enabled, is_no_fog_enabled, is_java_cubemap_enabled, is_particles_disabler_enabled, is_java_clouds_enabled, is_classic_skins_enabled, is_entity_culling_enabled, is_night_vision_enabled, is_xelo_title_enabled, is_client_capes_enabled, is_block_whiteoutline_enabled, is_no_flipbook_animations_enabled};
+use crate::config::{is_no_hurt_cam_enabled, is_no_fog_enabled, is_java_cubemap_enabled, is_particles_disabler_enabled, is_java_clouds_enabled, is_classic_skins_enabled, is_no_shadows_enabled, is_night_vision_enabled, is_xelo_title_enabled, is_client_capes_enabled, is_block_whiteoutline_enabled, is_no_flipbook_animations_enabled};
 use libc::{off64_t, off_t};
 use materialbin::{CompiledMaterialDefinition, MinecraftVersion};
 use ndk::asset::Asset;
@@ -35,7 +35,7 @@ const TITLE_PNG: &[u8] = include_bytes!("minecraft_title_5.png");
 
 const RENDER_CHUNK_NV_MATERIAL_BIN: &[u8] = include_bytes!("utils/nightvision_materials/RenderChunk.material.bin");
 
-const ENTITY_MATERIAL: &[u8] = include_bytes!("optimizers/entityculling/entity.material");
+const SHADOWS_MATERIAL: &[u8] = include_bytes!("optimizers/noshadows/shadows.material");
 
 const CUSTOM_SPLASHES_JSON: &str = r#"{"splashes":["Xelo Client","Xelo > any other client","The Best Client!!","BlueCat","Xelo is so much better","Xelo Optimizes like no other client","Make Sure to star our repository:https://github.com/Xelo-Client/Xelo","Contributions open!","Made by the community, for the community","Yami is goated!!"]}"#;
 
@@ -143,13 +143,13 @@ fn get_nightvision_material_data(filename: &str) -> Option<&'static [u8]> {
     }
 }
 
-fn get_entity_material_data(filename: &str) -> Option<&'static [u8]> {
-    if !is_entity_culling_enabled() {
+fn get_shadows_material_data(filename: &str) -> Option<&'static [u8]> {
+    if !is_no_shadows_enabled() {
         return None;
     }
     
     match filename {
-        "entity.material" => Some(ENTITY_MATERIAL),
+        "shadows.material" => Some(SHADOWS_MATERIAL),
         _ => None,
     }
 }
@@ -866,9 +866,9 @@ pub(crate) unsafe fn open(
         return aasset;
     }
     
-    if let Some(entity_material_data) = get_entity_material_data(&filename_str) {
-        log::info!("Intercepting {} with entity material (entityculling enabled)", filename_str);
-        let buffer = entity_material_data.to_vec();
+    if let Some(shadows_material_data) = get_shadows_material_data(&filename_str) {
+        log::info!("Intercepting {} with shadow material (noshadows enabled)", filename_str);
+        let buffer = shadows_material_data.to_vec();
         let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;
