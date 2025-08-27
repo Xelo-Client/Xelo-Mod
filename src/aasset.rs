@@ -1,5 +1,5 @@
 use crate::ResourceLocation;
-use crate::config::{is_no_hurt_cam_enabled, is_no_fog_enabled, is_java_cubemap_enabled, is_particles_disabler_enabled, is_java_clouds_enabled, is_classic_skins_enabled, is_no_shadows_enabled, is_night_vision_enabled, is_xelo_title_enabled, is_client_capes_enabled, is_block_whiteoutline_enabled, is_no_flipbook_animations_enabled};
+use crate::config::{is_no_hurt_cam_enabled, is_no_fog_enabled, is_java_cubemap_enabled, is_particles_disabler_enabled, is_java_clouds_enabled, is_classic_skins_enabled, is_no_shadows_enabled, is_night_vision_enabled, is_xelo_title_enabled, is_client_capes_enabled, is_block_whiteoutline_enabled, is_no_flipbook_animations_enabled, is_no_spyglass_overlay_enabled, is_no_pumpkin_overlay_enabled};
 use libc::{off64_t, off_t};
 use materialbin::{CompiledMaterialDefinition, MinecraftVersion};
 use ndk::asset::Asset;
@@ -32,6 +32,8 @@ const RENDER_CHUNK_MATERIAL_BIN: &[u8] = include_bytes!("utils/no_fog_materials/
 const CAPE_TEXTURE_PATH: &str = "/storage/emulated/0/Android/data/com.origin.launcher/files/origin_mods/xelo_cape.png";
 
 const TITLE_PNG: &[u8] = include_bytes!("minecraft_title_5.png");
+
+const CLEAR_PNG: &[u8] = include_bytes!("utils/clear/c.png");
 
 const RENDER_CHUNK_NV_MATERIAL_BIN: &[u8] = include_bytes!("utils/nightvision_materials/RenderChunk.material.bin");
 
@@ -229,13 +231,35 @@ fn get_java_cubemap_material_data(filename: &str) -> Option<&'static [u8]> {
     }
 }
 
-fn get_title_png_data(filename: &str) -> Option<&'static [u8]> {
+    fn get_title_png_data(filename: &str) -> Option<&'static [u8]> {
     if !is_xelo_title_enabled() {
         return None;
     }
     
     match filename {
         "title.png" => Some(TITLE_PNG),
+        _ => None,
+    }
+}
+
+fn get_pumpkin_png_data(filename: &str) -> Option<&'static [u8]> {
+    if !is_no_pumpkin_overlay_enabled() {
+        return None;
+    }
+    
+    match filename {
+        "pumpkinblur.png" => Some(CLEAR_PNG),
+        _ => None,
+    }
+}
+
+fn get_spyglass_png_data(filename: &str) -> Option<&'static [u8]> {
+    if !is_no_spyglass_overlay_enabled() {
+        return None;
+    }
+    
+    match filename {
+        "spyglass_scope.png" => Some(CLEAR_PNG),
         _ => None,
     }
 }
@@ -787,6 +811,22 @@ if is_particles_disabler_file(c_path) {
     if let Some(title_png_data) = get_title_png_data(&filename_str) {
         log::info!("Intercepting {} with xelo title png (xelo-title enabled)", filename_str);
         let buffer = title_png_data.to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+    
+    if let Some(spyglass_png_data) = get_spyglass_png_data(&filename_str) {
+        log::info!("Intercepting {} with no spyglass png (no-spyglass-overlay-enabled enabled)", filename_str);
+        let buffer = spyglass_png_data.to_vec();
+        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
+    
+    if let Some(pumpkin_png_data) = get_pumpkin_png_data(&filename_str) {
+        log::info!("Intercepting {} with no pumpkin overlay png (no-pumpkin-overlay-enabled enabled)", filename_str);
+        let buffer = pumpkin_png_data.to_vec();
         let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;

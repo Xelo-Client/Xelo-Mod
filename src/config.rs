@@ -44,6 +44,12 @@ pub struct ModConfig {
     
     #[serde(rename = "no_flipbook_animations")]
     pub no_flipbook_animations: bool,
+    
+    #[serde(rename = "no_pumpkin_overlay")]
+    pub no_pumpkin_overlay: bool,
+    
+    #[serde(rename = "no_spyglass_overlay")]
+    pub no_spyglass_overlay: bool,
     // You can add more fields as needed
     // #[serde(rename = "CustomField")]
     // pub custom_field: bool,
@@ -63,6 +69,8 @@ impl Default for ModConfig {
             client_capes: false,
             no_shadows: false,
             no_flipbook_animations: false,
+            no_spyglass_overlay: false,
+            no_pumpkin_overlay: false,
             white_block_outline: false,
         }
     }
@@ -177,6 +185,14 @@ pub fn is_block_whiteoutline_enabled() -> bool {
 }
 pub fn is_no_flipbook_animations_enabled() -> bool {
     get_config().no_flipbook_animations
+}
+
+pub fn is_no_pumpkin_overlay_enabled() -> bool {
+    get_config().no_pumpkin_overlay
+}
+
+pub fn is_no_spyglass_overlay_enabled() -> bool {
+    get_config().no_spyglass_overlay
 }
 
 // You can add more helper functions for other config values
