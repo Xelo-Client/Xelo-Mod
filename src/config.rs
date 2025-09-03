@@ -50,6 +50,10 @@ pub struct ModConfig {
     
     #[serde(rename = "no_spyglass_overlay")]
     pub no_spyglass_overlay: bool,
+    
+    #[serde(rename = "double_tppview")]
+    pub double_tppview: bool,
+    
     // You can add more fields as needed
     // #[serde(rename = "CustomField")]
     // pub custom_field: bool,
@@ -72,6 +76,7 @@ impl Default for ModConfig {
             no_spyglass_overlay: false,
             no_pumpkin_overlay: false,
             white_block_outline: false,
+            double_tppview: false,
         }
     }
 }
@@ -180,9 +185,11 @@ pub fn is_client_capes_enabled() -> bool {
 pub fn is_no_shadows_enabled() -> bool {
     get_config().no_shadows
 }
+
 pub fn is_block_whiteoutline_enabled() -> bool {
     get_config().white_block_outline
 }
+
 pub fn is_no_flipbook_animations_enabled() -> bool {
     get_config().no_flipbook_animations
 }
@@ -193,6 +200,10 @@ pub fn is_no_pumpkin_overlay_enabled() -> bool {
 
 pub fn is_no_spyglass_overlay_enabled() -> bool {
     get_config().no_spyglass_overlay
+}
+
+pub fn is_double_tppview_enabled() -> bool {
+    get_config().double_tppview
 }
 
 // You can add more helper functions for other config values

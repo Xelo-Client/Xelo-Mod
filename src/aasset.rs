@@ -1,5 +1,5 @@
 use crate::ResourceLocation;
-use crate::config::{is_no_hurt_cam_enabled, is_no_fog_enabled, is_java_cubemap_enabled, is_particles_disabler_enabled, is_java_clouds_enabled, is_classic_skins_enabled, is_no_shadows_enabled, is_night_vision_enabled, is_xelo_title_enabled, is_client_capes_enabled, is_block_whiteoutline_enabled, is_no_flipbook_animations_enabled, is_no_spyglass_overlay_enabled, is_no_pumpkin_overlay_enabled};
+use crate::config::{is_no_hurt_cam_enabled, is_no_fog_enabled, is_java_cubemap_enabled, is_particles_disabler_enabled, is_java_clouds_enabled, is_classic_skins_enabled, is_no_shadows_enabled, is_night_vision_enabled, is_xelo_title_enabled, is_client_capes_enabled, is_block_whiteoutline_enabled, is_no_flipbook_animations_enabled, is_no_spyglass_overlay_enabled, is_no_pumpkin_overlay_enabled, is_double_tppview_enabled};
 use libc::{off64_t, off_t};
 use materialbin::{CompiledMaterialDefinition, MinecraftVersion};
 use ndk::asset::Asset;
@@ -218,6 +218,103 @@ fn is_particles_disabler_file(c_path: &Path) -> bool {
     common_json_patterns.iter().any(|pattern| {
         path_str.contains(pattern) || path_str.ends_with(pattern)
     })
+}
+
+fn is_third_person_camera_file(c_path: &Path) -> bool {
+    if !is_double_tppview_enabled() {
+        return false;
+    }
+    
+    let path_str = c_path.to_string_lossy();
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+    
+    // Must be exactly third_person.json
+    if filename != "third_person.json" {
+        return false;
+    }
+    
+    // Check if it's in cameras directory
+    let third_person_patterns = [
+        "cameras/third_person.json",
+        "/cameras/third_person.json",
+        "resource_packs/vanilla/cameras/third_person.json",
+        "assets/resource_packs/vanilla/cameras/third_person.json",
+        "vanilla/cameras/third_person.json",
+        "assets/cameras/third_person.json",
+    ];
+    
+    third_person_patterns.iter().any(|pattern| {
+        path_str.contains(pattern) || path_str.ends_with(pattern)
+    })
+}
+
+fn modify_third_person_radius(original_data: &[u8]) -> Option<Vec<u8>> {
+    let json_str = match std::str::from_utf8(original_data) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("Failed to parse third_person.json as UTF-8: {}", e);
+            return None;
+        }
+    };
+    
+    let mut json_value: Value = match serde_json::from_str(json_str) {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Failed to parse third_person.json as JSON: {}", e);
+            return None;
+        }
+    };
+    
+    // Navigate to the camera_orbit radius
+    if let Some(camera_entity) = json_value
+        .get_mut("minecraft:camera_entity")
+        .and_then(|ce| ce.as_object_mut())
+    {
+        if let Some(components) = camera_entity
+            .get_mut("components")
+            .and_then(|comp| comp.as_object_mut())
+        {
+            if let Some(camera_orbit) = components
+                .get_mut("minecraft:camera_orbit")
+                .and_then(|orbit| orbit.as_object_mut())
+            {
+                // Check if radius exists and modify it
+                if let Some(radius) = camera_orbit.get("radius") {
+                    let current_radius = radius.as_f64().unwrap_or(4.0);
+                    log::info!("Found radius: {}, changing to: {}", current_radius, current_radius * 2.0);
+                    camera_orbit.insert("radius".to_string(), Value::from(current_radius * 2.0));
+                } else {
+                    // If radius doesn't exist, add it with doubled value
+                    log::info!("No radius found, adding radius: 8.0");
+                    camera_orbit.insert("radius".to_string(), Value::from(8.0));
+                }
+            } else {
+                log::warn!("minecraft:camera_orbit not found in third_person.json");
+                return None;
+            }
+        } else {
+            log::error!("components not found in third_person.json");
+            return None;
+        }
+    } else {
+        log::error!("minecraft:camera_entity not found in third_person.json");
+        return None;
+    }
+    
+    // Convert back to JSON string with proper formatting
+    match serde_json::to_string_pretty(&json_value) {
+        Ok(modified_json) => {
+            log::info!("Successfully modified third_person.json radius");
+            Some(modified_json.into_bytes())
+        },
+        Err(e) => {
+            log::error!("Failed to serialize modified third_person.json: {}", e);
+            None
+        }
+    }
 }
 
 fn get_java_cubemap_material_data(filename: &str) -> Option<&'static [u8]> {
@@ -682,6 +779,42 @@ pub(crate) unsafe fn open(
         let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;
+    }
+    
+    if is_third_person_camera_file(c_path) {
+        log::info!("Intercepting third_person.json with double TPP view modification: {}", c_path.display());
+        
+        // Read the original file first
+        if aasset.is_null() {
+            log::error!("Failed to open original third_person.json");
+            return aasset;
+        }
+        
+        let length = ndk_sys::AAsset_getLength(aasset) as usize;
+        if length == 0 {
+            log::error!("third_person.json has zero length");
+            return aasset;
+        }
+        
+        let mut original_data = vec![0u8; length];
+        let bytes_read = ndk_sys::AAsset_read(aasset, original_data.as_mut_ptr() as *mut libc::c_void, length);
+        
+        if bytes_read != length as i32 {
+            log::error!("Failed to read original third_person.json completely (read {}, expected {})", bytes_read, length);
+            return aasset;
+        }
+        
+        // Reset the asset position for normal operation
+        ndk_sys::AAsset_seek(aasset, 0, libc::SEEK_SET);
+        
+        if let Some(modified_data) = modify_third_person_radius(&original_data) {
+            let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+            wanted_lock.insert(AAssetPtr(aasset), Cursor::new(modified_data));
+            return aasset;
+        } else {
+            log::warn!("Failed to modify third_person.json radius, using original");
+            return aasset;
+        }
     }
 
     // Classic skins replacements
