@@ -247,7 +247,7 @@ fn is_particles_disabler_file(c_path: &Path) -> bool {
 
     patterns.iter().any(|pattern| path_str.contains(pattern) || path_str.ends_with(pattern))
 }
-}
+
 
 fn is_third_person_camera_file(c_path: &Path) -> bool {
     if !is_double_tppview_enabled() {
