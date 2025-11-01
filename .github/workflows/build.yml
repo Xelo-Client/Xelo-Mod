@@ -28,3 +28,4 @@ jobs:
           name: mtbinloader2-${{ matrix.target }}
           path: target/${{ matrix.target }}/githubci/libmtbinloader2.so
 
+

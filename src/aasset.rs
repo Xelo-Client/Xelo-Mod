@@ -39,7 +39,17 @@ const RENDER_CHUNK_NV_MATERIAL_BIN: &[u8] = include_bytes!("utils/nightvision_ma
 
 const SHADOWS_MATERIAL: &[u8] = include_bytes!("optimizers/noshadows/shadows.material");
 
-const COMMON_JSON: &[u8] = include_bytes!("optimizers/noparticles/common.json");
+// particles disabler files start
+
+const PARTICLE_MATERIAL_BIN: &[u8] = include_bytes!("optimizers/noparticles/Particle.material.bin");
+
+const PARTICLEFORWARDPBR_MATERIAL_BIN: &[u8] =
+include_bytes!("optimizers/noparticles/ParticleForwardPBR.material.bin");
+
+const PARTICLEPREPASS_MATERIAL_BIN: &[u8] =
+include_bytes!("optimizers/noparticles/ParticlePrepass.material.bin");
+
+// particles disabler files end
 
 const CUSTOM_SPLASHES_JSON: &str = r#"{"splashes":["Xelo Client","Xelo > any other client","The Best Client!!","BlueCat","Xelo is so much better","Xelo Optimizes like no other client","Make Sure to star our repository: https://github.com/Xelo-Client/Xelo","Contributions open!","Made by the community, for the community","Yami is goated!!"]}"#;
 
@@ -193,32 +203,51 @@ fn is_particles_disabler_file(c_path: &Path) -> bool {
     if !is_particles_disabler_enabled() {
         return false;
     }
-    
+
     let path_str = c_path.to_string_lossy();
     let filename = match c_path.file_name() {
         Some(name) => name.to_string_lossy(),
         None => return false,
     };
-    
-    // Must be exactly flipbook_textures.json
-    if filename != "common.json" {
+
+    let fname = filename.as_ref();
+    if fname != "Particle.material.bin"
+        && fname != "ParticleForwardPBR.material.bin"
+        && fname != "ParticlePrepass.material.bin"
+    {
         return false;
     }
-    
-    // Check if it's in valid animation locations
-    let common_json_patterns = [
-        "materials/common.json",
-        "/materials/common.json",
-        "resource_packs/vanilla/materials/common.json",
-        "assets/resource_packs/vanilla/materials/common.json",
-        "vanilla/materials/common.json",
-        "assets/materials/common.json",
+
+    // Combined patterns for all three particle files
+    let patterns = [
+        // Particle.material.bin patterns
+        "materials/Particle.material.bin",
+        "/materials/Particle.material.bin",
+        "resource_packs/vanilla/materials/Particle.material.bin",
+        "assets/resource_packs/vanilla/materials/Particle.material.bin",
+        "vanilla/materials/Particle.material.bin",
+        "assets/materials/Particle.material.bin",
+
+        // ParticleForwardPBR.material.bin patterns
+        "materials/ParticleForwardPBR.material.bin",
+        "/materials/ParticleForwardPBR.material.bin",
+        "resource_packs/vanilla/materials/ParticleForwardPBR.material.bin",
+        "assets/resource_packs/vanilla/materials/ParticleForwardPBR.material.bin",
+        "vanilla/materials/ParticleForwardPBR.material.bin",
+        "assets/materials/ParticleForwardPBR.material.bin",
+
+        // ParticlePrepass.material.bin patterns
+        "materials/ParticlePrepass.material.bin",
+        "/materials/ParticlePrepass.material.bin",
+        "resource_packs/vanilla/materials/ParticlePrepass.material.bin",
+        "assets/resource_packs/vanilla/materials/ParticlePrepass.material.bin",
+        "vanilla/materials/ParticlePrepass.material.bin",
+        "assets/materials/ParticlePrepass.material.bin",
     ];
-    
-    common_json_patterns.iter().any(|pattern| {
-        path_str.contains(pattern) || path_str.ends_with(pattern)
-    })
+
+    patterns.iter().any(|pattern| path_str.contains(pattern) || path_str.ends_with(pattern))
 }
+
 
 fn is_third_person_camera_file(c_path: &Path) -> bool {
     if !is_double_tppview_enabled() {
@@ -925,13 +954,21 @@ pub(crate) unsafe fn open(
     return aasset;
 }
 
+
 if is_particles_disabler_file(c_path) {
-    log::info!("Intercepting common json with no particles: {}", c_path.display());
-    let buffer = COMMON_JSON.to_vec();
+    log::info!("Intercepting particle material file with combined replacements: {}", c_path.display());
+    
+    // Combine all particle material buffers
+    let mut combined_buffer = Vec::new();
+    combined_buffer.extend_from_slice(&PARTICLE_MATERIAL_BIN);
+    combined_buffer.extend_from_slice(&PARTICLEFORWARDPBR_MATERIAL_BIN);
+    combined_buffer.extend_from_slice(&PARTICLEPREPASS_MATERIAL_BIN);
+    
     let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-    wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+    wanted_lock.insert(AAssetPtr(aasset), Cursor::new(combined_buffer));
     return aasset;
 }
+
     
     if let Some(java_cubemap_data) = get_java_cubemap_material_data(&filename_str) {
         log::info!("Intercepting {} with java-cubemap material (java-cubemap enabled)", filename_str);
