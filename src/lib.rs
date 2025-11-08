@@ -1,6 +1,3 @@
-use cpp_string::ResourceLocation;
-mod aasset;
-mod jniopts;
 use std::{
     ffi::CStr,
     fs,
@@ -10,11 +7,13 @@ use std::{
     sync::{atomic::AtomicPtr, OnceLock},
 };
 mod config;
+mod jniopts;
 mod preloader;
 use config::init_config;
+mod aasset;
 mod plthook;
 use crate::plthook::replace_plt_functions;
-use bhook::hook_fn;
+use cpp_string::ResourceLocation;
 use core::mem::transmute;
 use cxx::CxxString;
 use libc::c_void;
@@ -76,20 +75,12 @@ pub fn setup_logging() {
     );
 }
 #[ctor::ctor]
-fn main() {
+fn safe_setup() {
     setup_logging();
-    init_config();
-    log::info!("Starting");
-    let mcmap = find_minecraft_library_manually()
-        .expect("Cannot find libminecraftpe.so in memory maps - device not supported");
-    let addr = find_signatures(&RPMC_PATTERNS, mcmap).expect("No signature was found");
-    log::info!("Hooking ResourcePackManager constructor");
-    unsafe {
-        rpm_ctor::hook_address(addr as *mut u8);
-    };
-    log::info!("Hooking AssetManager functions");
-    hook_aaset();
+    std::panic::set_hook(Box::new(move |_panic_info| {}));
+    main();
 }
+
 #[derive(Debug)]
 struct SimpleMapRange {
     start: usize,
@@ -220,15 +211,13 @@ pub static RPM_LOAD: OnceLock<RpmLoadFn> = OnceLock::new();
 hook_fn! {
     fn rpm_ctor(this: *mut libc::c_void,unk1: usize,unk2: usize,needs_init: bool) -> *mut libc::c_void = {
         use std::sync::atomic::Ordering;
-        log::info!("rpm ctor called");
         let result = call_original(this, unk1, unk2, needs_init);
-        log::info!("RPM pointer has been obtained");
         crate::PACKM_OBJ.store(this, Ordering::Release);
-        crate::RPM_LOAD.set(crate::get_load(this)).unwrap();
+        crate::RPM_LOAD.set(crate::get_load(this)).expect("Load function is only hooked once");
         self_disable();
-        log::info!("hook exit");
         result
-    }
+    },
+    priority = 14400  
 }
 
 type RpmLoadFn = unsafe extern "C" fn(*mut c_void, ResourceLocation, Pin<&mut CxxString>) -> bool;
