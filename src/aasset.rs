@@ -1,20 +1,32 @@
 use crate::ResourceLocation;
 use crate::config::{is_no_hurt_cam_enabled, is_no_fog_enabled, is_java_cubemap_enabled, is_particles_disabler_enabled, is_java_clouds_enabled, is_classic_skins_enabled, is_no_shadows_enabled, is_night_vision_enabled, is_xelo_title_enabled, is_client_capes_enabled, is_block_whiteoutline_enabled, is_no_flipbook_animations_enabled, is_no_spyglass_overlay_enabled, is_no_pumpkin_overlay_enabled, is_double_tppview_enabled};
-use libc::{off64_t, off_t};
-use materialbin::{CompiledMaterialDefinition, MinecraftVersion};
-use ndk::asset::Asset;
+use crate::{
+    cpp_string::{ResourceLocation, StackString},
+    jniopts::OPTS,
+};
+use cxx::CxxString;
+use libc::{c_char, c_int, c_void, off64_t, off_t, size_t};
+use materialbin::{
+    bgfx_shader::BgfxShader, pass::ShaderStage, CompiledMaterialDefinition, MinecraftVersion,
+};use ndk::asset::{Asset, AssetManager};
 use ndk_sys::{AAsset, AAssetManager};
 use once_cell::sync::Lazy;
 use scroll::Pread;
 use serde_json::{Value, Map};
 use std::{
     borrow::Cow,
+    cell::UnsafeCell,
+    pin::Pin,
+    ops::{Deref, DerefMut},
     collections::HashMap,
     ffi::{CStr, CString, OsStr},
     io::{self, Cursor, Read, Seek, Write},
     os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
-    sync::{Mutex, OnceLock},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        LazyLock, Mutex, OnceLock,
+    },
 };
 
 #[derive(PartialEq, Eq, Hash)]

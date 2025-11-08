@@ -7,22 +7,42 @@ use std::{
     sync::{atomic::AtomicPtr, OnceLock},
 };
 mod config;
+mod jniopts;
+mod preloader;
 use config::init_config;
 mod aasset;
 mod plthook;
 use crate::plthook::replace_plt_functions;
 use bhook::hook_fn;
+use cpp_string::ResourceLocation;
 use core::mem::transmute;
 use cxx::CxxString;
 use libc::c_void;
 use plt_rs::DynamicLibrary;
 use tinypatscan::Pattern;
 
+
+fn resolve_pl_signature(signature: &str, module_name: &str) -> Option<*const u8> {
+    unsafe {
+        let sig_cstr = std::ffi::CString::new(signature).unwrap();
+        let mod_cstr = std::ffi::CString::new(module_name).unwrap();
+ 
+        let result = preloader::pl_resolve_signature(sig_cstr.as_ptr(), mod_cstr.as_ptr());
+        if result == 0 {
+            None
+        } else {
+            Some(result as *const u8)
+        }
+    }
+}
+
+
 #[cfg(target_arch = "aarch64")]
-const RPMC_PATTERNS: [Pattern<80>; 2] = [
-    Pattern::from_str("FF 03 03 D1 FD 7B 07 A9 FD C3 01 91 F9 43 00 F9 F8 5F 09 A9 F6 57 0A A9 F4 4F 0B A9 59 D0 3B D5 F6 03 03 2A 28 17 40 F9 F5 03 02 AA F3 03 00 AA A8 83 1F F8 28 10 40 F9"),
-    Pattern::from_str("FF 83 02 D1 FD 7B 06 A9 FD 83 01 91 F8 5F 07 A9 F6 57 08 A9 F4 4F 09 A9 58 D0 3B D5 F6 03 03 2A 08 17 40 F9 F5 03 02 AA F3 03 00 AA A8 83 1F F8 28 10 40 F9 28 01 00 B4"),
+const RPMC_SIGNATURES: [&str; 1] = [
+    "FF 83 02 D1 FD 7B 04 A9 FB 2B 00 F9 FA 67 06 A9 F8 5F 07 A9 F6 57 08 A9 F4 4F 09 A9 FD 03 01 91 5A D0 3B D5 F6 03 03 2A F5 03 02 AA 48 17 40 F9 F3 03 00 AA A8 83 1F F8",
 ];
+
+
 #[cfg(target_arch = "arm")]
 const RPMC_PATTERNS: [Pattern<80>; 1] = [Pattern::from_str(
     "F0 B5 03 AF 2D E9 00 ?? ?? B0 05 46 ?? 48 98 46 92 46 78 44 00 68 00 68 ?? 90 08 69",
@@ -86,6 +106,14 @@ impl SimpleMapRange {
     }
 }
 
+fn main() {
+    let addr = find_signatures_using_pl_lib().expect("No signature was found");
+    unsafe {
+        rpm_ctor::hook_address(addr as *mut u8);
+    };
+    hook_aaset();
+}
+
 fn find_minecraft_library_manually() -> Result<SimpleMapRange, Box<dyn std::error::Error>> {
     let contents = fs::read_to_string("/proc/self/maps")?;
     for line in contents.lines() {
@@ -136,6 +164,17 @@ fn find_signatures(signatures: &[Pattern<80>], range: SimpleMapRange) -> Option<
         #[cfg(target_arch = "arm")]
         let addr = unsafe { addr.offset(1) };
         return Some(addr);
+    }
+    None
+}
+
+fn find_signatures_using_pl_lib() -> Option<*const u8> {
+    for &signature in &RPMC_SIGNATURES {
+        if let Some(addr) = resolve_pl_signature(signature, "libminecraftpe.so") {
+            #[cfg(target_arch = "arm")]
+            let addr = unsafe { addr.offset(1) };
+            return Some(addr);
+        }
     }
     None
 }
