@@ -1,3 +1,6 @@
+use cpp_string::ResourceLocation;
+mod aasset;
+mod jniopts;
 use std::{
     ffi::CStr,
     fs,
@@ -7,14 +10,11 @@ use std::{
     sync::{atomic::AtomicPtr, OnceLock},
 };
 mod config;
-mod jniopts;
 mod preloader;
 use config::init_config;
-mod aasset;
 mod plthook;
 use crate::plthook::replace_plt_functions;
 use bhook::hook_fn;
-use cpp_string::ResourceLocation;
 use core::mem::transmute;
 use cxx::CxxString;
 use libc::c_void;
