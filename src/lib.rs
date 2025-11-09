@@ -13,7 +13,7 @@ use config::init_config;
 mod aasset;
 mod plthook;
 use crate::plthook::replace_plt_functions;
-mod cpp_string;
+use cpp_string::ResourceLocation;
 use core::mem::transmute;
 use cxx::CxxString;
 use libc::c_void;
@@ -39,17 +39,6 @@ fn resolve_pl_signature(signature: &str, module_name: &str) -> Option<*const u8>
 #[cfg(target_arch = "aarch64")]
 const RPMC_SIGNATURES: [&str; 1] = [
     "FF 83 02 D1 FD 7B 04 A9 FB 2B 00 F9 FA 67 06 A9 F8 5F 07 A9 F6 57 08 A9 F4 4F 09 A9 FD 03 01 91 5A D0 3B D5 F6 03 03 2A F5 03 02 AA 48 17 40 F9 F3 03 00 AA A8 83 1F F8",
-];
-
-
-#[cfg(target_arch = "arm")]
-const RPMC_PATTERNS: [Pattern<80>; 1] = [Pattern::from_str(
-    "F0 B5 03 AF 2D E9 00 ?? ?? B0 05 46 ?? 48 98 46 92 46 78 44 00 68 00 68 ?? 90 08 69",
-)];
-#[cfg(target_arch = "x86_64")]
-const RPMC_PATTERNS: [Pattern<80>; 2] = [
-    Pattern::from_str("55 41 57 41 56 41 55 41 54 53 48 83 EC ? 41 89 CF 49 89 D6 48 89 FB 64 48 8B 04 25 28 00 00 00 48 89 44 24 ? 48 8B 7E"),
-    Pattern::from_str("55 41 57 41 56 53 48 83 EC ? 41 89 CF 49 89 D6 48 89 FB 64 48 8B 04 25 28 00 00 00 48 89 44 24 ? 48 8B 7E"),
 ];
 
 #[repr(transparent)]
