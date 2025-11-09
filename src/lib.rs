@@ -13,6 +13,7 @@ use config::init_config;
 mod aasset;
 mod plthook;
 use crate::plthook::replace_plt_functions;
+mod cpp_string;
 use cpp_string::ResourceLocation;
 use core::mem::transmute;
 use cxx::CxxString;
