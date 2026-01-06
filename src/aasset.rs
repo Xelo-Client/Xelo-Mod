@@ -1013,6 +1013,7 @@ pub(crate) unsafe fn open(
     }
 
     // Material replacements
+    let filename_str = os_filename.to_string_lossy();
     if let Some(shadows_material_data) = get_shadows_material_data(&filename_str) {
         log::info!("Intercepting {} with shadow material (noshadows enabled)", filename_str);
         let buffer = shadows_material_data.to_vec();
