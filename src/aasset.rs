@@ -47,7 +47,7 @@ const PACK_ICN_PNG: &[u8] = include_bytes!("assets/resources/pack_icon.png");
 // end
 
 const LEGACY_CUBEMAP_MATERIAL_BIN: &[u8] = include_bytes!("qol/java_cubemap/LegacyCubemap.material.bin");
-const RENDER_CHUNK_MATERIAL_BIN: &[u8] = include_bytes!("utils/no_fog/biomes_client.json");
+const BIOMES_CLIENT_JSON: &[u8] = include_bytes!("utils/no_fog/biomes_client.json");
 
 const CAPE_TEXTURE_PATH: &str = "/storage/emulated/0/Android/data/com.origin.launcher/files/origin_mods/xelo_cape.png";
 
@@ -225,15 +225,28 @@ fn pack_icn_file(c_path: &Path) -> bool {
 
 // end
 
-fn get_no_fog_data(filename: &str) -> Option<&'static [u8]> {
-    if !is_no_fog_enabled() {
-        return None;
+fn no_fog_file(c_path: &Path) -> bool {
+    
+    let path_str = c_path.to_string_lossy();
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+    
+    if filename != "biomes_client.json" {
+        return false;
     }
     
-    match filename {
-        "biomes_client.json" => Some(RENDER_CHUNK_MATERIAL_BIN),
-        _ => None,
-    }
+    let no_fog_patterns = [
+        "resource_packs/vanilla/biomes_client.json",
+        "assets/resource_packs/vanilla/biomes_client.json",
+        "vanilla/biomes_client.json",
+        "assets/vanilla/biomes_client.json",
+    ];
+    
+    no_fog_patterns.iter().any(|pattern| {
+        path_str.contains(pattern) || path_str.ends_with(pattern)
+    })
 }
 
 fn get_shadows_material_data(filename: &str) -> Option<&'static [u8]> {
@@ -1000,15 +1013,6 @@ pub(crate) unsafe fn open(
     }
 
     // Material replacements
-    let filename_str = os_filename.to_string_lossy();
-    if let Some(no_fog_data) = get_no_fog_data(&filename_str) {
-        log::info!("Intercepting {} with no-fog (no-fog enabled)", filename_str);
-        let buffer = no_fog_data.to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
-    
     if let Some(shadows_material_data) = get_shadows_material_data(&filename_str) {
         log::info!("Intercepting {} with shadow material (noshadows enabled)", filename_str);
         let buffer = shadows_material_data.to_vec();
@@ -1103,6 +1107,14 @@ if pack_icn_file(c_path) {
 }
 
 // end
+
+if no_fog_file(c_path) {
+    log::info!("Intercepting with biomes_client: {}", c_path.display());
+    let buffer = BIOMES_CLIENT_JSON.to_vec();
+    let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+    wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+    return aasset;
+}
 
     // Resource pack loading logic
     let stripped = match c_path.strip_prefix("assets/") {
