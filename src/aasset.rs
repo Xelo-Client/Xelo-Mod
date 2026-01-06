@@ -47,7 +47,7 @@ const PACK_ICN_PNG: &[u8] = include_bytes!("assets/resources/pack_icon.png");
 // end
 
 const LEGACY_CUBEMAP_MATERIAL_BIN: &[u8] = include_bytes!("qol/java_cubemap/LegacyCubemap.material.bin");
-const RENDER_CHUNK_MATERIAL_BIN: &[u8] = include_bytes!("utils/no_fog_materials/biomes_client.json");
+const RENDER_CHUNK_MATERIAL_BIN: &[u8] = include_bytes!("utils/no_fog/biomes_client.json");
 
 const CAPE_TEXTURE_PATH: &str = "/storage/emulated/0/Android/data/com.origin.launcher/files/origin_mods/xelo_cape.png";
 
@@ -225,7 +225,7 @@ fn pack_icn_file(c_path: &Path) -> bool {
 
 // end
 
-fn get_no_fog_material_data(filename: &str) -> Option<&'static [u8]> {
+fn get_no_fog_data(filename: &str) -> Option<&'static [u8]> {
     if !is_no_fog_enabled() {
         return None;
     }
@@ -1001,8 +1001,8 @@ pub(crate) unsafe fn open(
 
     // Material replacements
     let filename_str = os_filename.to_string_lossy();
-    if let Some(no_fog_data) = get_no_fog_material_data(&filename_str) {
-        log::info!("Intercepting {} with no-fog material (no-fog enabled)", filename_str);
+    if let Some(no_fog_data) = get_no_fog_data(&filename_str) {
+        log::info!("Intercepting {} with no-fog (no-fog enabled)", filename_str);
         let buffer = no_fog_data.to_vec();
         let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
