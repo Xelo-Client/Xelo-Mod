@@ -61,7 +61,7 @@ fn version_from_string(string: &str) -> Option<MinecraftVersion> {
     Some(mcversion)
 }
 #[no_mangle]
-extern "C" fn Java_com_origin_launcher_FeatureSettings_setAutofixVersions(
+extern "C" fn Java_com_origin_launcher_FeatureSettings_setLightmapAutofixer(
     mut _env: JNIEnv,
     _thiz: JObject,
     on: jboolean,
@@ -70,7 +70,7 @@ extern "C" fn Java_com_origin_launcher_FeatureSettings_setAutofixVersions(
     opts.handle_lightmaps = on == JNI_TRUE;
 }
 #[no_mangle]
-extern "C" fn Java_com_origin_launcher_FeatureSettings_setAutofixVersions(
+extern "C" fn Java_com_origin_launcher_FeatureSettings_setTextureLodAutofixer(
     mut _env: JNIEnv,
     _thiz: JObject,
     on: jboolean,
