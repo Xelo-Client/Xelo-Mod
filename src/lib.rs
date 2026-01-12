@@ -16,7 +16,7 @@ mod jniopts;
 use crate::plthook::replace_plt_functions;
 mod preloader;
 mod brightness;
-use bhook::hook_fn as bhook_hook_fn;
+use bhook::hook_fn;
 use core::mem::transmute;
 use cxx::CxxString;
 use libc::c_void;
