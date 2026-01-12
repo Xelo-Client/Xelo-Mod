@@ -1,3 +1,5 @@
+mod autofixer;
+#[deny(clippy::indexing_slicing)]
 use std::{
     ffi::CStr,
     fs,
@@ -10,6 +12,7 @@ mod config;
 use config::init_config;
 mod aasset;
 mod plthook;
+mod jniopts;
 use crate::plthook::replace_plt_functions;
 mod preloader;
 mod brightness;
