@@ -47,7 +47,7 @@ const PACK_ICN_PNG: &[u8] = include_bytes!("assets/resources/pack_icon.png");
 // end
 
 const LEGACY_CUBEMAP_MATERIAL_BIN: &[u8] = include_bytes!("qol/java_cubemap/LegacyCubemap.material.bin");
-const BIOMES_CLIENT_JSON: &[u8] = include_bytes!("utils/no_fog/biomes_client.json");
+const NO_FOG_MATERIAL: &[u8] = include_bytes!("utils/no_fog/RenderChunk.material.bin");
 
 const CAPE_TEXTURE_PATH: &str = "/storage/emulated/0/Android/data/com.origin.launcher/files/origin_mods/xelo_cape.png";
 
@@ -233,15 +233,17 @@ fn no_fog_file(c_path: &Path) -> bool {
         None => return false,
     };
     
-    if filename != "biomes_client.json" {
+    if filename != "RenderChunk.material.bin" {
         return false;
     }
     
     let no_fog_patterns = [
-        "resource_packs/vanilla/biomes_client.json",
-        "assets/resource_packs/vanilla/biomes_client.json",
-        "vanilla/biomes_client.json",
-        "assets/vanilla/biomes_client.json",
+        "materials/RenderChunk.material.bin",
+        "/materials/RenderChunk.material.bin",
+        "resource_packs/vanilla/materials/RenderChunk.material.bin",
+        "assets/resource_packs/vanilla/materials/RenderChunk.material.bin",
+        "vanilla/materials/RenderChunk.material.bin",
+        "assets/materials/RenderChunk.material.bin",
     ];
     
     no_fog_patterns.iter().any(|pattern| {
@@ -1110,8 +1112,8 @@ if pack_icn_file(c_path) {
 // end
 
 if no_fog_file(c_path) {
-    log::info!("Intercepting with biomes_client: {}", c_path.display());
-    let buffer = BIOMES_CLIENT_JSON.to_vec();
+    log::info!("Intercepting with RenderChunk.material.bin: {}", c_path.display());
+    let buffer = NO_FOG_MATERIAL.to_vec();
     let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
     wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
     return aasset;
