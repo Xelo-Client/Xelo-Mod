@@ -1,15 +1,18 @@
+mod autofixer;
+#[deny(clippy::indexing_slicing)]
 use std::{
     ffi::CStr,
     fs,
     pin::Pin,
     ptr::null_mut,
     str::SplitWhitespace,
-    sync::{atomic::AtomicPtr, OnceLock},
+    sync::{atomic::AtomicPtr, OnceLock, LockResult, Mutex},
 };
 mod config;
 use config::init_config;
 mod aasset;
 mod plthook;
+mod jniopts;
 use crate::plthook::replace_plt_functions;
 mod preloader;
 mod brightness;
@@ -197,4 +200,16 @@ type RpmLoadFn = unsafe extern "C" fn(*mut c_void, ResourceLocation, Pin<&mut Cx
 unsafe fn get_load(packm_ptr: *mut c_void) -> RpmLoadFn {
     let vptr = *transmute::<*mut c_void, *mut *mut *const u8>(packm_ptr);
     transmute::<*const u8, RpmLoadFn>(*vptr.offset(2))
+}
+
+pub trait LockResultExt {
+    type Guard;
+    fn ignore_poison(self) -> Self::Guard;
+}
+
+impl<Guard> LockResultExt for LockResult<Guard> {
+    type Guard = Guard;
+    fn ignore_poison(self) -> Guard {
+        self.unwrap_or_else(|e| e.into_inner())
+    }
 }
