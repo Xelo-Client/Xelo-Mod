@@ -15,9 +15,9 @@ extern "C" {
 }
 
 #[macro_export]
-macro_rules! hook_fn {
+macro_rules! hook_fn_pl {
     ($vis:vis fn $name:ident($($arg:ident: $ty:ty),*) -> $ret:ty = $body:block) => {
-        hook_fn!($vis fn $name($($arg: $ty),*) -> $ret = $body, priority = 10);
+        hook_fn_pl!($vis fn $name($($arg: $ty),*) -> $ret = $body, priority = 10);
     };
     
     ($vis:vis fn $name:ident($($arg:ident: $ty:ty),*) -> $ret:ty = $body:block, priority = $priority:expr) => {
