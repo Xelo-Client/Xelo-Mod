@@ -1,53 +1,53 @@
-use crate::ResourceLocation;
+//Explanation: Aasset is NOT thread-safe anyways so we will not try adding thread safety either
+#![allow(static_mut_refs)]
+use crate::{
+    loader::{Buffer, FileLoader},
+    LockResultExt,
+};
 use crate::config::{is_no_hurt_cam_enabled, is_no_fog_enabled, is_java_cubemap_enabled, is_particles_disabler_enabled, is_java_clouds_enabled, is_classic_skins_enabled, is_no_shadows_enabled, is_xelo_title_enabled, is_client_capes_enabled, is_block_whiteoutline_enabled, is_no_flipbook_animations_enabled, is_no_spyglass_overlay_enabled, is_no_pumpkin_overlay_enabled, is_double_tppview_enabled,
     is_custom_cross_hair_enabled
 };
-use libc::{off64_t, off_t};
-use log::{info, warn};
-use materialbin::{CompiledMaterialDefinition, MinecraftVersion};
-use ndk::asset::Asset;
+use libc::{c_char, c_int, c_void, off64_t, off_t, size_t};
 use ndk_sys::{AAsset, AAssetManager};
 use once_cell::sync::Lazy;
-use scroll::Pread;
-use serde_json::{Value, Map};
 use std::{
-    borrow::Cow,
+    cell::UnsafeCell,
     collections::HashMap,
     ffi::{CStr, CString, OsStr},
     io::{self, Cursor, Read, Seek, Write},
-    fs,
     os::unix::ffi::OsStrExt,
     path::{Path, PathBuf},
-    sync::{Mutex, OnceLock, Arc},
+    //    ptr,
+    fs,
+    sync::{LazyLock, Mutex, Arc, OnceLock},
 };
+use serde_json::{Value, Map};
 
+static MC_FILELOADER: LazyLock<Mutex<FileLoader>> = LazyLock::new(|| Mutex::new(FileLoader::new()));
+// This makes me feel wrong... but all we will do is compare the pointer
+// and the struct will be used in a mutex so this is safe??
 #[derive(PartialEq, Eq, Hash)]
 struct AAssetPtr(*const ndk_sys::AAsset);
 unsafe impl Send for AAssetPtr {}
 
-static MC_VERSION: OnceLock<Option<MinecraftVersion>> = OnceLock::new();
+// The assets we have registered to replace data about
+static mut WANTED_ASSETS: LazyLock<UnsafeCell<HashMap<AAssetPtr, Buffer>>> =
+    LazyLock::new(|| UnsafeCell::new(HashMap::new()));
 
-static WANTED_ASSETS: Lazy<Mutex<HashMap<AAssetPtr, Cursor<Vec<u8>>>>> =
+static WANTED_ASSETS_MUTEX: Lazy<Mutex<HashMap<AAssetPtr, Cursor<Vec<u8>>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
     
-//custom cross hair module
+// Xelo constants start
 
 pub const CUSTOM_CROSS_HAIR_PNG: &[u8] = include_bytes!("utils/custom_cross_hair/cross_hair.png");
 
 pub const CUSTOM_CROSS_HAIR_PATH: &str = "/storage/emulated/0/games/xelo_client/custom_cross_hair/cross_hair.png";
 
-// END
-
-// Xelo api
-
-const MANIFEST_JSON: &[u8] = include_bytes!("assets/resources/manifest.json");
+const NO_FOG_MATERIAL: &[u8] = include_bytes!("utils/no_fog/RenderChunk.material.bin");
 
 const PACK_ICN_PNG: &[u8] = include_bytes!("assets/resources/pack_icon.png");
 
-// end
-
 const LEGACY_CUBEMAP_MATERIAL_BIN: &[u8] = include_bytes!("qol/java_cubemap/LegacyCubemap.material.bin");
-const NO_FOG_MATERIAL: &[u8] = include_bytes!("utils/no_fog/RenderChunk.material.bin");
 
 const CAPE_TEXTURE_PATH: &str = "/storage/emulated/0/Android/data/com.origin.launcher/files/origin_mods/xelo_cape.png";
 
@@ -56,18 +56,6 @@ const TITLE_PNG: &[u8] = include_bytes!("minecraft_title_5.png");
 const CLEAR_PNG: &[u8] = include_bytes!("utils/clear/c.png");
 
 const SHADOWS_MATERIAL: &[u8] = include_bytes!("optimizers/noshadows/shadows.material");
-
-// particles disabler files start
-
-const PARTICLE_MATERIAL_BIN: &[u8] = include_bytes!("optimizers/noparticles/Particle.material.bin");
-
-const PARTICLEFORWARDPBR_MATERIAL_BIN: &[u8] =
-include_bytes!("optimizers/noparticles/ParticleForwardPBR.material.bin");
-
-const PARTICLEPREPASS_MATERIAL_BIN: &[u8] =
-include_bytes!("optimizers/noparticles/ParticlePrepass.material.bin");
-
-// particles disabler files end
 
 const CUSTOM_SPLASHES_JSON: &str = r#"{"splashes":["Xelo Client","Xelo > any other client","The Best Client!!","BlueCat","I am Viable","VCX","Xelo is so much better","Xelo Optimizes like no other client","Make Sure to star our repository: https://github.com/Xelo-Client/Xelo","Contributions open!","Made by the community, for the community","Yami is goated!!"]}"#;
 
@@ -78,8 +66,6 @@ const CUSTOM_THIRD_PERSON_FRONT_JSON: &str = r#"{"format_version":"1.18.10","min
 const CUSTOM_LOADING_MESSAGES_JSON: &str = r#"{"beginner_loading_messages":["Xelo Client","Xelo > any other client","The Best Client!!","BlueCat","I am Viable","VCX","Xelo is so much better","Xelo Optimizes like no other client","Make Sure to star our repository: https://github.com/Xelo-Client/Xelo","Contributions open!","Made by the community, for the community","Yami is goated!!"],"mid_game_loading_messages":["Xelo Client","Xelo > any other client","The Best Client!!","BlueCat","I am Viable","VCX","Xelo is so much better","Xelo Optimizes like no other client","Make Sure to star our repository: https://github.com/Xelo-Client/Xelo","Contributions open!","Made by the community, for the community","Yami is goated!!"],"late_game_loading_messages":["Xelo Client","Xelo > any other client","The Best Client!!","BlueCat","I am Viable","VCX","Xelo is so much better","Xelo Optimizes like no other client","Make Sure to star our repository: https://github.com/Xelo-Client/Xelo","Contributions open!","Made by the community, for the community","Yami is goated!!"],"creative_loading_messages":["Xelo Client","Xelo > any other client","The Best Client!!","BlueCat","I am Viable","VCX","Xelo is so much better","Xelo Optimizes like no other client","Make Sure to star our repository: https://github.com/Xelo-Client/Xelo","Contributions open!","Made by the community, for the community","Yami is goated!!"],"editor_loading_messages":["Xelo Client","Xelo > any other client","The Best Client!!","BlueCat","I am Viable","VCX","Xelo is so much better","Xelo Optimizes like no other client","Make Sure to star our repository: https://github.com/Xelo-Client/Xelo","Contributions open!","Made by the community, for the community","Yami is goated!!"],"realms_loading_messages":["Xelo Client","Xelo > any other client","The Best Client!!","BlueCat","I am Viable","VCX","Xelo is so much better","Xelo Optimizes like no other client","Make Sure to star our repository: https://github.com/Xelo-Client/Xelo","Contributions open!","Made by the community, for the community","Yami is goated!!"],"addons_loading_messages":["Xelo Client","Xelo > any other client","The Best Client!!","BlueCat","I am Viable","VCX","Xelo is so much better","Xelo Optimizes like no other client","Make Sure to star our repository: https://github.com/Xelo-Client/Xelo","Contributions open!","Made by the community, for the community","Yami is goated!!"],"store_progress_tooltips":["Xelo Client","Xelo > any other client","The Best Client!!","BlueCat","I am Viable","VCX","Xelo is so much better","Xelo Optimizes like no other client","Make Sure to star our repository: https://github.com/Xelo-Client/Xelo","Contributions open!","Made by the community, for the community","Yami is goated!!"]}"#;
 
 const CUSTOM_SKINS_JSON: &str = r#"{"skins":[{"localization_name":"Steve","geometry":"geometry.humanoid.custom","texture":"steve.png","type":"free"},{"localization_name":"Alex","geometry":"geometry.humanoid.customSlim","texture":"alex.png","type":"free"}],"serialize_name":"Standard","localization_name":"Standard"}"#;
-
-const FLIPBOOK_MATERIAL_BIN: &[u8] = include_bytes!("utils/no_flipbook_animations/Flipbook.material.bin");
 
 const CUSTOM_BLOCKOUTLINE: &str = r#"{"materials":{"block_overlay":{"+states":["Blending","DisableDepthWrite","DisableAlphaWrite","StencilWrite","EnableStencilTest"],"backFace":{"stencilDepthFailOp":"Keep","stencilFailOp":"Keep","stencilFunc":"NotEqual","stencilPassOp":"Replace"},"depthBias":100.0,"depthBiasOGL":100.0,"depthFunc":"LessEqual","fragmentShader":"shaders/texture_cutout.fragment","frontFace":{"stencilDepthFailOp":"Keep","stencilFailOp":"Keep","stencilFunc":"NotEqual","stencilPassOp":"Replace"},"msaaSupport":"Both","slopeScaledDepthBias":15.0,"slopeScaledDepthBiasOGL":20.0,"stencilReadMask":2,"stencilRef":2,"stencilWriteMask":2,"variants":[{"skinning":{"+defines":["USE_SKINNING"],"vertexFields":[{"field":"Position"},{"field":"BoneId0"},{"field":"UV1"},{"field":"UV0"}]}}],"vertexFields":[{"field":"Position"},{"field":"UV1"},{"field":"UV0"}],"vertexShader":"shaders/uv.vertex","vrGeometryShader":"shaders/uv.geometry"},"cracks_overlay:block_overlay":{"+samplerStates":[{"samplerIndex":0,"textureFilter":"Point"}],"blendDst":"Zero","blendSrc":"DestColor","depthFunc":"LessEqual","fragmentShader":"shaders/texture.fragment"},"cracks_overlay_alpha_test:cracks_overlay":{"+defines":["ALPHA_TEST"],"+states":["DisableCulling"]},"cracks_overlay_tile_entity:cracks_overlay":{"+samplerStates":[{"samplerIndex":0,"textureWrap":"Repeat"}],"variants":[{"skinning":{"+defines":["USE_SKINNING"],"vertexFields":[{"field":"Position"},{"field":"BoneId0"},{"field":"Normal"},{"field":"UV0"}]}}],"vertexFields":[{"field":"Position"},{"field":"Normal"},{"field":"UV0"}],"vertexShader":"shaders/uv_scale.vertex","vrGeometryShader":"shaders/uv.geometry"},"debug":{"depthFunc":"LessEqual","fragmentShader":"shaders/color.fragment","msaaSupport":"Both","vertexFields":[{"field":"Position"},{"field":"Color"}],"vertexShader":"shaders/color.vertex","vrGeometryShader":"shaders/color.geometry"},"fullscreen_cube_overlay":{"+samplerStates":[{"samplerIndex":0,"textureFilter":"Point"}],"depthFunc":"Always","fragmentShader":"shaders/texture_ccolor.fragment","msaaSupport":"Both","vertexFields":[{"field":"Position"},{"field":"UV0"}],"vertexShader":"shaders/uv.vertex","vrGeometryShader":"shaders/uv.geometry"},"fullscreen_cube_overlay_blend:fullscreen_cube_overlay":{"+states":["Blending"]},"fullscreen_cube_overlay_opaque:fullscreen_cube_overlay":{"+states":["DisableCulling"]},"lightning":{"+states":["DisableCulling","Blending"],"blendDst":"One","blendSrc":"SourceAlpha","depthFunc":"LessEqual","fragmentShader":"shaders/lightning.fragment","msaaSupport":"Both","vertexFields":[{"field":"Position"},{"field":"Color"}],"vertexShader":"shaders/color.vertex","vrGeometryShader":"shaders/color.geometry"},"name_tag":{"+states":["Blending","DisableDepthWrite"],"depthFunc":"Always","vertexShader":"shaders/position.vertex","vrGeometryShader":"shaders/position.geometry","fragmentShader":"shaders/current_color.fragment","vertexFields":[{ "field":"Position"}],"+samplerStates":[{"samplerIndex":0,"textureFilter":"Point"}],"msaaSupport":"Both"},"name_tag_depth_tested:name_tag":{"depthFunc":"LessEqual"},"name_tag_alpha_tested:name_tag":{"+defines":[ "ALPHA_TEST" ],"depthFunc":"LessEqual","-states":["Blending","DisableDepthWrite"]},    "name_tag_text":{"+states":["Blending"],"depthFunc":"Always","msaaSupport":"Both"},"name_text_depth_tested:sign_text":{},"overlay_quad":{"+samplerStates":[{"samplerIndex":0,"textureFilter":"Bilinear"}],"+states":["DisableCulling","DisableDepthWrite","Blending"],"blendDst":"OneMinusSrcAlpha","blendSrc":"SourceAlpha","depthFunc":"Always","fragmentShader":"shaders/texture_raw_alphatest.fragment","vertexFields":[{"field":"Position"},{"field":"UV0"}],"vertexShader":"shaders/uv.vertex","vrGeometryShader":"shaders/uv.geometry"},"overlay_quad_clear":{"depthFunc":"Always","fragmentShader":"shaders/color.fragment","msaaSupport":"Both","vertexFields":[{"field":"Position"}],"vertexShader":"shaders/simple.vertex","vrGeometryShader":"shaders/color.geometry"},"plankton:precipitation":{"+defines":["COMFORT_MODE","FLIP_OCCLUSION","NO_VARIETY"]},"precipitation":{"+defines":["COMFORT_MODE"],"+samplerStates":[{"samplerIndex":0,"textureFilter":"Point"},{"samplerIndex":1,"textureFilter":"Point"},{"samplerIndex":2,"textureFilter":"Bilinear"}],"+states":["DisableCulling","DisableDepthWrite","Blending"],"blendDst":"OneMinusSrcAlpha","blendSrc":"SourceAlpha","depthFunc":"LessEqual","fragmentShader":"shaders/rain_snow.fragment","msaaSupport":"Both","vertexFields":[{"field":"Position"},{"field":"Color"},{"field":"UV0"}],"vertexShader":"shaders/rain_snow.vertex","vrGeometryShader":"shaders/rain_snow.geometry"},"rain:precipitation":{},"selection_box":{"+defines":["LINE_STRIP"],"depthFunc":"LessEqual","fragmentShader":"shaders/selection_box.fragment","msaaSupport":"Both","primitiveMode":"Line","vertexFields":[{"field":"Position"}],"vertexShader":"shaders/selection_box.vertex","vrGeometryShader":"shaders/position.geometry"},"selection_overlay:block_overlay":{"blendDst":"SourceColor","blendSrc":"DestColor","vertexShader":"shaders/uv_selection_overlay.vertex"},"selection_overlay_alpha:selection_overlay_level":{"vertexFields":[{"field":"Position"},{"field":"UV1"},{"field":"UV0"}]},"selection_overlay_block_entity:selection_overlay":{"variants":[{"skinning":{"+defines":["USE_SKINNING"],"vertexFields":[{"field":"Position"},{"field":"BoneId0"},{"field":"Normal"},{"field":"UV0"}]},"skinning_color":{"+defines":["USE_SKINNING"],"vertexFields":[{"field":"Position"},{"field":"BoneId0"},{"field":"Color"},{"field":"Normal"},{"field":"UV0"}]}}],"vertexFields":[{"field":"Position"},{"field":"Normal"},{"field":"UV0"}]},"selection_overlay_double_sided:selection_overlay":{"+states":["DisableCulling"]},"selection_overlay_item:selection_overlay":{},"selection_overlay_level:selection_overlay":{"msaaSupport":"Both","vertexFields":[{"field":"Position"},{"field":"Normal"},{"field":"UV0"}]},"selection_overlay_opaque:selection_overlay":{"fragmentShader":"shaders/current_color.fragment","msaaSupport":"Both","vertexShader":"shaders/selection_box.vertex","vrGeometryShader":"shaders/position.geometry"},"sign_text":{"+defines":["ALPHA_TEST","USE_LIGHTING"],"+samplerStates":[{"samplerIndex":0,"textureFilter":"Point"}],"+states":["Blending"],"depthBias":10.0,"depthBiasOGL":10.0,"depthFunc":"LessEqual","fragmentShader":"shaders/text.fragment","msaaSupport":"Both","slopeScaledDepthBias":2.0,"slopeScaledDepthBiasOGL":10.0,"vertexFields":[{"field":"Position"},{"field":"Color"},{"field":"UV0"}],"vertexShader":"shaders/color_uv.vertex","vrGeometryShader":"shaders/color_uv.geometry"},"snow:precipitation":{"+defines":["SNOW"]},"version":"1.0.0"}}"#;
 
@@ -107,53 +93,20 @@ const CLASSIC_ALEX_TEXTURE: &[u8] = include_bytes!("a.png");
 
 const JAVA_CLOUDS_TEXTURE: &[u8] = include_bytes!("Diskksks.png");
 
-fn get_current_mcver(man: ndk::asset::AssetManager) -> Option<MinecraftVersion> {
-    let mut file = match get_uitext(man) {
-        Some(asset) => asset,
-        None => {
-            log::error!("Shader fixing is disabled as no mc version was found");
-            return None;
-        }
-    };
-    let mut buf = Vec::with_capacity(file.length());
-    if let Err(e) = file.read_to_end(&mut buf) {
-        log::error!("Something is wrong with AssetManager, mc detection failed: {e}");
+// Xelo constants end
+
+// Xelo fn start
+
+fn get_no_fog_material_data(filename: &str) -> Option<&'static [u8]> {
+    if !is_no_fog_enabled() {
         return None;
-    };
-    for version in materialbin::ALL_VERSIONS {
-        if buf
-            .pread_with::<CompiledMaterialDefinition>(0, version)
-            .is_ok()
-        {
-            log::info!("Mc version is {version}");
-            return Some(version);
-        };
     }
-    None
-}
 
-fn get_uitext(man: ndk::asset::AssetManager) -> Option<Asset> {
-    const NEW: &CStr = c"assets/renderer/materials/UIText.material.bin";
-    const OLD: &CStr = c"renderer/materials/UIText.material.bin";
-    for path in [NEW, OLD] {
-        if let Some(asset) = man.open(path) {
-            return Some(asset);
-        }
-    }
-    None
-}
-
-macro_rules! folder_list {
-    ($( apk: $apk_folder:literal -> pack: $pack_folder:expr),
-        *,
-    ) => {
-        [
-            $(($apk_folder, $pack_folder)),*,
-        ]
+    match filename {
+        "RenderChunk.material.bin" => Some(NO_FOG_MATERIAL),
+        _ => None,
     }
 }
-
-// custom cross hair
 
 fn get_cross_hair_png_data(filename: &str) -> Option<Arc<Vec<u8>>> {
     if !is_custom_cross_hair_enabled() || filename != "cross_hair.png" {
@@ -162,41 +115,13 @@ fn get_cross_hair_png_data(filename: &str) -> Option<Arc<Vec<u8>>> {
     
     if std::path::Path::new(CUSTOM_CROSS_HAIR_PATH).exists() {
         if let Ok(user_data) = std::fs::read(CUSTOM_CROSS_HAIR_PATH) {
-            log::info!("✅ Loaded custom crosshair");
+            log::info!("Loaded custom crosshair");
             return Some(Arc::new(user_data));
         }
     }
     
-    log::info!("🎯 Using bundled crosshair");
+    log::info!("Using bundled crosshair");
     Some(Arc::new(CUSTOM_CROSS_HAIR_PNG.to_vec()))
-}
-
-//END
-
-// fabric style
-
-fn manifest_json_file(c_path: &Path) -> bool {
-    
-    let path_str = c_path.to_string_lossy();
-    let filename = match c_path.file_name() {
-        Some(name) => name.to_string_lossy(),
-        None => return false,
-    };
-    
-    if filename != "manifest.json" {
-        return false;
-    }
-    
-    let manifest_json_patterns = [
-        "resource_packs/oreui/manifest.json",
-        "assets/resource_packs/oreui/manifest.json",
-        "oreui/manifest.json",
-        "assets/oreui/manifest.json",
-    ];
-    
-    manifest_json_patterns.iter().any(|pattern| {
-        path_str.contains(pattern) || path_str.ends_with(pattern)
-    })
 }
 
 fn pack_icn_file(c_path: &Path) -> bool {
@@ -223,34 +148,6 @@ fn pack_icn_file(c_path: &Path) -> bool {
     })
 }
 
-// end
-
-fn no_fog_file(c_path: &Path) -> bool {
-    
-    let path_str = c_path.to_string_lossy();
-    let filename = match c_path.file_name() {
-        Some(name) => name.to_string_lossy(),
-        None => return false,
-    };
-    
-    if filename != "RenderChunk.material.bin" {
-        return false;
-    }
-    
-    let no_fog_patterns = [
-        "materials/RenderChunk.material.bin",
-        "/materials/RenderChunk.material.bin",
-        "resource_packs/vanilla/materials/RenderChunk.material.bin",
-        "assets/resource_packs/vanilla/materials/RenderChunk.material.bin",
-        "vanilla/materials/RenderChunk.material.bin",
-        "assets/materials/RenderChunk.material.bin",
-    ];
-    
-    no_fog_patterns.iter().any(|pattern| {
-        path_str.contains(pattern) || path_str.ends_with(pattern)
-    })
-}
-
 fn get_shadows_material_data(filename: &str) -> Option<&'static [u8]> {
     if !is_no_shadows_enabled() {
         return None;
@@ -273,12 +170,10 @@ fn is_no_flipbook_animations_file(c_path: &Path) -> bool {
         None => return false,
     };
     
-    // Must be exactly Flipbook.material.bin
     if filename != "Flipbook.material.bin" {
         return false;
     }
     
-    // Check if it's in valid animation locations
     let flipbook_textures_patterns = [
         "materials/Flipbook.material.bin",
         "/materials/Flipbook.material.bin",
@@ -788,21 +683,33 @@ fn modify_player_entity_json(original_data: &[u8]) -> Option<Vec<u8>> {
     }
 }
 
-pub(crate) unsafe fn open(
+// Xelo fn end
+
+pub unsafe extern "C" fn open(
     man: *mut AAssetManager,
-    fname: *const libc::c_char,
-    mode: libc::c_int,
-) -> *mut ndk_sys::AAsset {
+    fname: *const c_char,
+    mode: c_int,
+) -> *mut AAsset {
+    // This is where UB can happen, but we are merely a hook.
     let aasset = unsafe { ndk_sys::AAssetManager_open(man, fname, mode) };
+    let pointer = match std::ptr::NonNull::new(man) {
+        Some(yay) => yay,
+        None => {
+            log::warn!("AssetManager is null?, preposterous, mc detection failed");
+            return aasset;
+        }
+    };
+    let manager = unsafe { ndk::asset::AssetManager::from_ptr(pointer) };
     let c_str = unsafe { CStr::from_ptr(fname) };
     let raw_cstr = c_str.to_bytes();
     let os_str = OsStr::from_bytes(raw_cstr);
     let c_path: &Path = Path::new(os_str);
-    
     let Some(os_filename) = c_path.file_name() else {
         log::warn!("Path had no filename: {c_path:?}");
         return aasset;
     };
+    
+// Xelo Start
 
     // Debug logging for client capes
     if is_client_capes_enabled() {
@@ -818,7 +725,7 @@ pub(crate) unsafe fn open(
         log::info!("Intercepting cape_invisible texture with custom cape: {}", c_path.display());
         
         if let Some(custom_cape_data) = load_custom_cape_texture() {
-            let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+            let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
             wanted_lock.insert(AAssetPtr(aasset), Cursor::new(custom_cape_data));
             return aasset;
         } else {
@@ -868,7 +775,7 @@ pub(crate) unsafe fn open(
         ndk_sys::AAsset_seek(aasset, 0, libc::SEEK_SET);
         
         if let Some(modified_data) = modify_player_entity_json(&original_data) {
-            let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+            let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
             wanted_lock.insert(AAssetPtr(aasset), Cursor::new(modified_data));
             return aasset;
         } else {
@@ -881,7 +788,7 @@ pub(crate) unsafe fn open(
     if os_filename == "splashes.json" {
         log::info!("Intercepting splashes.json with custom content");
         let buffer = CUSTOM_SPLASHES_JSON.as_bytes().to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;
     }
@@ -890,7 +797,7 @@ pub(crate) unsafe fn open(
     if os_filename == "loading_messages.json" {
         log::info!("Intercepting loading_messages.json with custom content");
         let buffer = CUSTOM_LOADING_MESSAGES_JSON.as_bytes().to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;
     }
@@ -899,7 +806,7 @@ pub(crate) unsafe fn open(
     if is_clouds_texture_file(c_path) {
         log::info!("Intercepting clouds texture with Java clouds texture: {}", c_path.display());
         let buffer = JAVA_CLOUDS_TEXTURE.to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;
     }
@@ -931,7 +838,7 @@ pub(crate) unsafe fn open(
         ndk_sys::AAsset_seek(aasset, 0, libc::SEEK_SET);
         
         if let Some(modified_data) = modify_third_person_radius(&original_data) {
-            let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+            let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
             wanted_lock.insert(AAssetPtr(aasset), Cursor::new(modified_data));
             return aasset;
         } else {
@@ -944,7 +851,7 @@ pub(crate) unsafe fn open(
     if is_classic_skins_steve_texture_file(c_path) {
         log::info!("Intercepting steve.png with classic Steve texture: {}", c_path.display());
         let buffer = CLASSIC_STEVE_TEXTURE.to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;
     }
@@ -952,7 +859,7 @@ pub(crate) unsafe fn open(
     if is_classic_skins_alex_texture_file(c_path) {
         log::info!("Intercepting alex.png with classic Alex texture: {}", c_path.display());
         let buffer = CLASSIC_ALEX_TEXTURE.to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;
     }
@@ -960,7 +867,7 @@ pub(crate) unsafe fn open(
     if is_classic_skins_json_file(c_path) {
         log::info!("Intercepting skins.json with classic skins content: {}", c_path.display());
         let buffer = CUSTOM_SKINS_JSON.as_bytes().to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;
     }
@@ -969,7 +876,7 @@ pub(crate) unsafe fn open(
     if is_client_capes_file(c_path) {
         log::info!("Intercepting cape render controller file with cape content: {}", c_path.display());
         let buffer = RENDER_JSON.as_bytes().to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;
     }
@@ -977,7 +884,7 @@ pub(crate) unsafe fn open(
     if is_outline_material_file(c_path) {
         log::info!("Intercepting  ui3dmaterial file with new content: {}", c_path.display());
         let buffer = CUSTOM_BLOCKOUTLINE.as_bytes().to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;
     }
@@ -991,7 +898,7 @@ pub(crate) unsafe fn open(
             if os_filename == "first_person.json" {
                 log::info!("Intercepting cameras/first_person.json with custom content (nohurtcam enabled)");
                 let buffer = CUSTOM_FIRST_PERSON_JSON.as_bytes().to_vec();
-                let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+                let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
                 wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
                 return aasset;
             }
@@ -999,7 +906,7 @@ pub(crate) unsafe fn open(
             if os_filename == "third_person.json" {
                 log::info!("Intercepting cameras/third_person.json with custom content (nohurtcam enabled)");
                 let buffer = CUSTOM_THIRD_PERSON_JSON.as_bytes().to_vec();
-                let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+                let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
                 wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
                 return aasset;
             }
@@ -1007,27 +914,34 @@ pub(crate) unsafe fn open(
             if os_filename == "third_person_front.json" {
                 log::info!("Intercepting cameras/third_person_front.json with custom content (nohurtcam enabled)");
                 let buffer = CUSTOM_THIRD_PERSON_FRONT_JSON.as_bytes().to_vec();
-                let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+                let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
                 wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
                 return aasset;
             }
         }
     }
-
+        
     // Material replacements
     let filename_str = os_filename.to_string_lossy();
+        if let Some(no_fog_data) = get_no_fog_material_data(&filename_str) {
+        log::info!("Intercepting {} with no-fog material (no-fog enabled)", filename_str);
+        let buffer = no_fog_data.to_vec();
+        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
     if let Some(shadows_material_data) = get_shadows_material_data(&filename_str) {
         log::info!("Intercepting {} with shadow material (noshadows enabled)", filename_str);
         let buffer = shadows_material_data.to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;
     }
     
     if is_no_flipbook_animations_file(c_path) {
     log::info!("Intercepting shield animation with side shield animation: {}", c_path.display());
-    let buffer = FLIPBOOK_MATERIAL_BIN.to_vec();
-    let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+    let buffer = Vec::new();
+    let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
     wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
     return aasset;
 }
@@ -1037,13 +951,10 @@ if is_particles_disabler_file(c_path) {
     log::info!("Intercepting particle material file with combined replacements: {}", c_path.display());
     
     // Combine all particle material buffers
-    let mut combined_buffer = Vec::new();
-    combined_buffer.extend_from_slice(&PARTICLE_MATERIAL_BIN);
-    combined_buffer.extend_from_slice(&PARTICLEFORWARDPBR_MATERIAL_BIN);
-    combined_buffer.extend_from_slice(&PARTICLEPREPASS_MATERIAL_BIN);
+    let buffer = Vec::new();
     
-    let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-    wanted_lock.insert(AAssetPtr(aasset), Cursor::new(combined_buffer));
+    let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
+    wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
     return aasset;
 }
 
@@ -1051,7 +962,7 @@ if is_particles_disabler_file(c_path) {
     if let Some(java_cubemap_data) = get_java_cubemap_material_data(&filename_str) {
         log::info!("Intercepting {} with java-cubemap material (java-cubemap enabled)", filename_str);
         let buffer = java_cubemap_data.to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;
     }
@@ -1059,7 +970,7 @@ if is_particles_disabler_file(c_path) {
     if let Some(title_png_data) = get_title_png_data(&filename_str) {
         log::info!("Intercepting {} with xelo title png (xelo-title enabled)", filename_str);
         let buffer = title_png_data.to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;
     }
@@ -1067,7 +978,7 @@ if is_particles_disabler_file(c_path) {
     if let Some(spyglass_png_data) = get_spyglass_png_data(&filename_str) {
         log::info!("Intercepting {} with no spyglass png (no-spyglass-overlay-enabled enabled)", filename_str);
         let buffer = spyglass_png_data.to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;
     }
@@ -1075,7 +986,7 @@ if is_particles_disabler_file(c_path) {
     if let Some(pumpkin_png_data) = get_pumpkin_png_data(&filename_str) {
         log::info!("Intercepting {} with no pumpkin overlay png (no-pumpkin-overlay-enabled enabled)", filename_str);
         let buffer = pumpkin_png_data.to_vec();
-        let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
         wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
         return aasset;
     }
@@ -1084,289 +995,252 @@ if is_particles_disabler_file(c_path) {
     
     if let Some(cross_hair_png_data) = get_cross_hair_png_data(&filename_str) {
     log::info!("Intercepting {} with crosshair png (custom-cross-hair-enabled enabled)", filename_str);
-    let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+    let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
     wanted_lock.insert(AAssetPtr(aasset), Cursor::new(cross_hair_png_data.clone().to_vec()));
-    return aasset;
-}
-    
-    //END
-
-// fabric style
-
-if manifest_json_file(c_path) {
-    log::info!("Intercepting with manifest: {}", c_path.display());
-    let buffer = MANIFEST_JSON.to_vec();
-    let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-    wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
     return aasset;
 }
 
 if pack_icn_file(c_path) {
     log::info!("Intercepting with pack icon: {}", c_path.display());
     let buffer = PACK_ICN_PNG.to_vec();
-    let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
+    let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
     wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
     return aasset;
 }
-
-// end
-
-if no_fog_file(c_path) {
-    log::info!("Intercepting with RenderChunk.material.bin: {}", c_path.display());
-    let buffer = NO_FOG_MATERIAL.to_vec();
-    let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-    wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-    return aasset;
-}
-
-    // Resource pack loading logic
-    let stripped = match c_path.strip_prefix("assets/") {
-        Ok(yay) => yay,
-        Err(_e) => c_path,
-    };
     
-    let replacement_list = folder_list! {
-        apk: "gui/dist/hbui/" -> pack: "hbui/",
-        apk: "skin_packs/persona/" -> pack: "persona/",
-        apk: "renderer/" -> pack: "renderer/",
-        apk: "resource_packs/vanilla/cameras/" -> pack: "vanilla_cameras/",
-    };
+// Xelo end
     
-    for replacement in replacement_list {
-        if let Ok(file) = stripped.strip_prefix(replacement.0) {
-            cxx::let_cxx_string!(cxx_out = "");
-            let loadfn = match crate::RPM_LOAD.get() {
-                Some(ptr) => ptr,
-                None => {
-                    log::warn!("ResourcePackManager fn is not ready yet?");
-                    return aasset;
-                }
-            };
-            let mut arraybuf = [0; 128];
-            let file_path = opt_path_join(&mut arraybuf, &[Path::new(replacement.1), file]);
-            let packm_ptr = crate::PACKM_OBJ.load(std::sync::atomic::Ordering::Acquire);
-            let resource_loc = ResourceLocation::from_str(file_path.as_ref());
-            log::info!("loading rpck file: {:#?}", &file_path);
-            if packm_ptr.is_null() {
-                log::error!("ResourcePackManager ptr is null");
-                return aasset;
-            }
-            loadfn(packm_ptr, resource_loc, cxx_out.as_mut());
-            if cxx_out.is_empty() {
-                log::info!("File was not found");
-                return aasset;
-            }
-            let buffer = if os_filename.as_encoded_bytes().ends_with(b".material.bin") {
-                match process_material(man, cxx_out.as_bytes()) {
-                    Some(updated) => updated,
-                    None => cxx_out.as_bytes().to_vec(),
-                }
-            } else {
-                cxx_out.as_bytes().to_vec()
-            };
-            let mut wanted_lock = WANTED_ASSETS.lock().unwrap();
-            wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-            return aasset;
-        }
+    let mut sus = MC_FILELOADER.lock().ignore_poison();
+    if let Some(yay) = sus.get_file(c_path, manager) {
+        unsafe { WANTED_ASSETS.get_mut() }.insert(AAssetPtr(aasset), yay);
     }
-    return aasset;
+    aasset
 }
-
-fn opt_path_join<'a>(bytes: &'a mut [u8; 128], paths: &[&Path]) -> Cow<'a, CStr> {
-    let total_len: usize = paths.iter().map(|p| p.as_os_str().len()).sum();
-    if total_len + 1 > 128 {
-        let mut pathbuf = PathBuf::new();
-        for path in paths {
-            pathbuf.push(path);
-        }
-        let cpath = CString::new(pathbuf.into_os_string().as_encoded_bytes()).unwrap();
-        return Cow::Owned(cpath);
-    }
-
-    let mut writer = bytes.as_mut_slice();
-    for path in paths {
-        let osstr = path.as_os_str().as_bytes();
-        let _ = writer.write(osstr);
-    }
-    let _ = writer.write(&[0]);
-    let guh = CStr::from_bytes_until_nul(bytes).unwrap();
-    Cow::Borrowed(guh)
-}
-
-fn process_material(man: *mut AAssetManager, data: &[u8]) -> Option<Vec<u8>> {
-    let mcver = MC_VERSION.get_or_init(|| {
-        let pointer = match std::ptr::NonNull::new(man) {
-            Some(yay) => yay,
-            None => {
-                log::warn!("AssetManager is null?, preposterous, mc detection failed");
-                return None;
-            }
-        };
-        let manager = unsafe { ndk::asset::AssetManager::from_ptr(pointer) };
-        get_current_mcver(manager)
-    });
-    let mcver = (*mcver)?;
-    for version in materialbin::ALL_VERSIONS {
-        let material: CompiledMaterialDefinition = match data.pread_with(0, version) {
-            Ok(data) => data,
+macro_rules! handle_result {
+    ($expr:expr) => {
+        match $expr {
+            Ok(val) => val,
             Err(e) => {
-                log::trace!("[version] Parsing failed: {e}");
-                continue;
+                log::error!("{e}");
+                return -1;
             }
-        };
-        if version == mcver {
-            return None;
         }
-        let mut output = Vec::with_capacity(data.len());
-        if let Err(e) = material.write(&mut output, mcver) {
-            log::trace!("[version] Write error: {e}");
-            return None;
+    };
+}
+
+pub unsafe extern "C" fn seek64(aasset: *mut AAsset, off: off64_t, whence: c_int) -> off64_t {
+    let ptr = AAssetPtr(aasset);
+    
+    if let Some(file) = WANTED_ASSETS.get_mut().get_mut(&ptr) {
+        handle_result!(seek_facade(off, whence, file).try_into())
+    } else if let Ok(mut cursor_map) = WANTED_ASSETS_MUTEX.lock() {
+        if let Some(cursor) = cursor_map.get_mut(&ptr) {
+            let offset = match whence {
+                libc::SEEK_SET => io::SeekFrom::Start(off.max(0) as u64),
+                libc::SEEK_CUR => io::SeekFrom::Current(off),
+                libc::SEEK_END => io::SeekFrom::End(off),
+                _ => return ndk_sys::AAsset_seek64(aasset, off, whence),
+            };
+            match cursor.seek(offset) {
+                Ok(pos) => pos as off64_t,
+                Err(_) => ndk_sys::AAsset_seek64(aasset, off, whence),
+            }
+        } else {
+            ndk_sys::AAsset_seek64(aasset, off, whence)
         }
-        return Some(output);
+    } else {
+        ndk_sys::AAsset_seek64(aasset, off, whence)
     }
-
-    None
 }
 
-pub(crate) unsafe fn seek64(aasset: *mut AAsset, off: off64_t, whence: libc::c_int) -> off64_t {
-    let mut wanted_assets = WANTED_ASSETS.lock().unwrap();
-    let file = match wanted_assets.get_mut(&AAssetPtr(aasset)) {
-        Some(file) => file,
-        None => return ndk_sys::AAsset_seek64(aasset, off, whence),
-    };
-    seek_facade(off, whence, file) as off64_t
+pub unsafe extern "C" fn seek(aasset: *mut AAsset, off: off_t, whence: c_int) -> off_t {
+    let ptr = AAssetPtr(aasset);
+    
+    if let Some(file) = WANTED_ASSETS.get_mut().get_mut(&ptr) {
+        handle_result!(seek_facade(off.into(), whence, file).try_into())
+    } else if let Ok(mut cursor_map) = WANTED_ASSETS_MUTEX.lock() {
+        if let Some(cursor) = cursor_map.get_mut(&ptr) {
+            let offset = match whence {
+                libc::SEEK_SET => io::SeekFrom::Start(off.max(0) as u64),
+                libc::SEEK_CUR => io::SeekFrom::Current(off.into()),
+                libc::SEEK_END => io::SeekFrom::End(off.into()),
+                _ => return ndk_sys::AAsset_seek(aasset, off, whence),
+            };
+            match cursor.seek(offset) {
+                Ok(pos) => pos as off_t,
+                Err(_) => ndk_sys::AAsset_seek(aasset, off, whence),
+            }
+        } else {
+            ndk_sys::AAsset_seek(aasset, off, whence)
+        }
+    } else {
+        ndk_sys::AAsset_seek(aasset, off, whence)
+    }
 }
 
-pub(crate) unsafe fn seek(aasset: *mut AAsset, off: off_t, whence: libc::c_int) -> off_t {
-    let mut wanted_assets = WANTED_ASSETS.lock().unwrap();
-    let file = match wanted_assets.get_mut(&AAssetPtr(aasset)) {
-        Some(file) => file,
-        None => return ndk_sys::AAsset_seek(aasset, off, whence),
-    };
-    seek_facade(off.into(), whence, file) as off_t
-}
-
-pub(crate) unsafe fn read(
-    aasset: *mut AAsset,
-    buf: *mut libc::c_void,
-    count: libc::size_t,
-) -> libc::c_int {
-    let mut wanted_assets = WANTED_ASSETS.lock().unwrap();
-    let file = match wanted_assets.get_mut(&AAssetPtr(aasset)) {
-        Some(file) => file,
-        None => return ndk_sys::AAsset_read(aasset, buf, count),
-    };
+pub unsafe extern "C" fn read(aasset: *mut AAsset, buf: *mut c_void, count: size_t) -> c_int {
+    let ptr = AAssetPtr(aasset);
     let rs_buffer = core::slice::from_raw_parts_mut(buf as *mut u8, count);
-    let read_total = match file.read(rs_buffer) {
-        Ok(n) => n,
-        Err(e) => {
-            log::warn!("failed fake aaset read: {e}");
-            return -1 as libc::c_int;
+    
+    if let Some(file) = WANTED_ASSETS.get_mut().get_mut(&ptr) {
+        let read_total = handle_result!((*file).read(rs_buffer));
+        handle_result!(read_total.try_into())
+    } else if let Ok(mut cursor_map) = WANTED_ASSETS_MUTEX.lock() {
+        if let Some(cursor) = cursor_map.get_mut(&ptr) {
+            let read_total = handle_result!(cursor.read(rs_buffer));
+            handle_result!(read_total.try_into())
+        } else {
+            ndk_sys::AAsset_read(aasset, buf, count)
         }
-    };
-    read_total as libc::c_int
-}
-
-pub(crate) unsafe fn len(aasset: *mut AAsset) -> off_t {
-    let wanted_assets = WANTED_ASSETS.lock().unwrap();
-    let file = match wanted_assets.get(&AAssetPtr(aasset)) {
-        Some(file) => file,
-        None => return ndk_sys::AAsset_getLength(aasset),
-    };
-    file.get_ref().len() as off_t
-}
-
-pub(crate) unsafe fn len64(aasset: *mut AAsset) -> off64_t {
-    let wanted_assets = WANTED_ASSETS.lock().unwrap();
-    let file = match wanted_assets.get(&AAssetPtr(aasset)) {
-        Some(file) => file,
-        None => return ndk_sys::AAsset_getLength64(aasset),
-    };
-    file.get_ref().len() as off64_t
-}
-
-pub(crate) unsafe fn rem(aasset: *mut AAsset) -> off_t {
-    let wanted_assets = WANTED_ASSETS.lock().unwrap();
-    let file = match wanted_assets.get(&AAssetPtr(aasset)) {
-        Some(file) => file,
-        None => return ndk_sys::AAsset_getRemainingLength(aasset),
-    };
-    (file.get_ref().len() - file.position() as usize) as off_t
-}
-
-pub(crate) unsafe fn rem64(aasset: *mut AAsset) -> off64_t {
-    let wanted_assets = WANTED_ASSETS.lock().unwrap();
-    let file = match wanted_assets.get(&AAssetPtr(aasset)) {
-        Some(file) => file,
-        None => return ndk_sys::AAsset_getRemainingLength64(aasset),
-    };
-    (file.get_ref().len() - file.position() as usize) as off64_t
-}
-
-pub(crate) unsafe fn close(aasset: *mut AAsset) {
-    let mut wanted_assets = WANTED_ASSETS.lock().unwrap();
-    if wanted_assets.remove(&AAssetPtr(aasset)).is_none() {
-        ndk_sys::AAsset_close(aasset);
+    } else {
+        ndk_sys::AAsset_read(aasset, buf, count)
     }
 }
 
-pub(crate) unsafe fn get_buffer(aasset: *mut AAsset) -> *const libc::c_void {
-    let mut wanted_assets = WANTED_ASSETS.lock().unwrap();
-    let file = match wanted_assets.get_mut(&AAssetPtr(aasset)) {
-        Some(file) => file,
-        None => return ndk_sys::AAsset_getBuffer(aasset),
-    };
-    file.get_mut().as_mut_ptr().cast()
+pub unsafe extern "C" fn len(aasset: *mut AAsset) -> off_t {
+    let ptr = AAssetPtr(aasset);
+    
+    if let Some(file) = unsafe { WANTED_ASSETS.get_mut() }.get(&ptr) {
+        handle_result!(file.get_ref().len().try_into())
+    } else if let Ok(cursor_map) = WANTED_ASSETS_MUTEX.lock() {
+        if let Some(cursor) = cursor_map.get(&ptr) {
+            handle_result!(cursor.get_ref().len().try_into())
+        } else {
+            ndk_sys::AAsset_getLength(aasset)
+        }
+    } else {
+        ndk_sys::AAsset_getLength(aasset)
+    }
 }
 
-pub(crate) unsafe fn fd_dummy(
+pub unsafe extern "C" fn len64(aasset: *mut AAsset) -> off64_t {
+    let ptr = AAssetPtr(aasset);
+    
+    if let Some(file) = unsafe { WANTED_ASSETS.get_mut() }.get(&ptr) {
+        handle_result!(file.get_ref().len().try_into())
+    } else if let Ok(cursor_map) = WANTED_ASSETS_MUTEX.lock() {
+        if let Some(cursor) = cursor_map.get(&ptr) {
+            handle_result!(cursor.get_ref().len().try_into())
+        } else {
+            ndk_sys::AAsset_getLength64(aasset)
+        }
+    } else {
+        ndk_sys::AAsset_getLength64(aasset)
+    }
+}
+
+pub unsafe extern "C" fn rem(aasset: *mut AAsset) -> off_t {
+    let ptr = AAssetPtr(aasset);
+    
+    if let Some(file) = unsafe { WANTED_ASSETS.get_mut() }.get(&ptr) {
+        handle_result!((file.get_ref().len() - file.position() as usize).try_into())
+    } else if let Ok(cursor_map) = WANTED_ASSETS_MUTEX.lock() {
+        if let Some(cursor) = cursor_map.get(&ptr) {
+            handle_result!((cursor.get_ref().len() - cursor.position() as usize).try_into())
+        } else {
+            ndk_sys::AAsset_getRemainingLength(aasset)
+        }
+    } else {
+        ndk_sys::AAsset_getRemainingLength(aasset)
+    }
+}
+
+pub unsafe extern "C" fn rem64(aasset: *mut AAsset) -> off64_t {
+    let ptr = AAssetPtr(aasset);
+    
+    if let Some(file) = unsafe { WANTED_ASSETS.get_mut() }.get(&ptr) {
+        handle_result!((file.get_ref().len() - file.position() as usize).try_into())
+    } else if let Ok(cursor_map) = WANTED_ASSETS_MUTEX.lock() {
+        if let Some(cursor) = cursor_map.get(&ptr) {
+            handle_result!((cursor.get_ref().len() - cursor.position() as usize).try_into())
+        } else {
+            ndk_sys::AAsset_getRemainingLength64(aasset)
+        }
+    } else {
+        ndk_sys::AAsset_getRemainingLength64(aasset)
+    }
+}
+
+pub unsafe extern "C" fn close(aasset: *mut AAsset) {
+    let ptr = AAssetPtr(aasset);
+    
+    if let Some(buffer) = unsafe { WANTED_ASSETS.get_mut() }.remove(&ptr) {
+        MC_FILELOADER.lock().ignore_poison().last_buffer = Some(buffer);
+    }
+    WANTED_ASSETS_MUTEX.lock().unwrap().remove(&ptr);
+    
+    ndk_sys::AAsset_close(aasset);
+}
+
+pub unsafe extern "C" fn get_buffer(aasset: *mut AAsset) -> *const c_void {
+    let ptr = AAssetPtr(aasset);
+    
+    if let Some(file) = unsafe { WANTED_ASSETS.get_mut() }.get(&ptr) {
+        file.get_ref().as_ptr().cast()
+    } else if let Ok(cursor_map) = WANTED_ASSETS_MUTEX.lock() {
+        if let Some(cursor) = cursor_map.get(&ptr) {
+            cursor.get_ref().as_ptr().cast()
+        } else {
+            ndk_sys::AAsset_getBuffer(aasset)
+        }
+    } else {
+        ndk_sys::AAsset_getBuffer(aasset)
+    }
+}
+
+pub unsafe extern "C" fn fd_dummy(
     aasset: *mut AAsset,
     out_start: *mut off_t,
     out_len: *mut off_t,
-) -> libc::c_int {
-    let wanted_assets = WANTED_ASSETS.lock().unwrap();
-    match wanted_assets.get(&AAssetPtr(aasset)) {
-        Some(_) => {
-            log::error!("WE GOT BUSTED NOOO");
-            -1
-        }
-        None => ndk_sys::AAsset_openFileDescriptor(aasset, out_start, out_len),
+) -> c_int {
+    let ptr = AAssetPtr(aasset);
+    
+    if unsafe { WANTED_ASSETS.get_mut() }.contains_key(&ptr) {
+        log::error!("WE GOT BUSTED NOOO");
+        -1
+    } else if WANTED_ASSETS_MUTEX.lock().is_ok_and(|map| map.contains_key(&ptr)) {
+        log::error!("WE GOT BUSTED NOOO");
+        -1
+    } else {
+        ndk_sys::AAsset_openFileDescriptor(aasset, out_start, out_len)
     }
 }
 
-pub(crate) unsafe fn fd_dummy64(
+pub unsafe extern "C" fn fd_dummy64(
     aasset: *mut AAsset,
     out_start: *mut off64_t,
     out_len: *mut off64_t,
-) -> libc::c_int {
-    let wanted_assets = WANTED_ASSETS.lock().unwrap();
-    match wanted_assets.get(&AAssetPtr(aasset)) {
-        Some(_) => {
-            log::error!("WE GOT BUSTED NOOO");
-            -1
-        }
-        None => ndk_sys::AAsset_openFileDescriptor64(aasset, out_start, out_len),
+) -> c_int {
+    let ptr = AAssetPtr(aasset);
+    
+    if unsafe { WANTED_ASSETS.get_mut() }.contains_key(&ptr) {
+        log::error!("WE GOT BUSTED NOOO");
+        -1
+    } else if WANTED_ASSETS_MUTEX.lock().is_ok_and(|map| map.contains_key(&ptr)) {
+        log::error!("WE GOT BUSTED NOOO");
+        -1
+    } else {
+        ndk_sys::AAsset_openFileDescriptor64(aasset, out_start, out_len)
     }
 }
 
-pub(crate) unsafe fn is_alloc(aasset: *mut AAsset) -> libc::c_int {
-    let wanted_assets = WANTED_ASSETS.lock().unwrap();
-    match wanted_assets.get(&AAssetPtr(aasset)) {
-        Some(_) => false as libc::c_int,
-        None => ndk_sys::AAsset_isAllocated(aasset),
+pub unsafe extern "C" fn is_alloc(aasset: *mut AAsset) -> c_int {
+    let ptr = AAssetPtr(aasset);
+    
+    if unsafe { WANTED_ASSETS.get_mut() }.contains_key(&ptr) {
+        false as c_int
+    } else if WANTED_ASSETS_MUTEX.lock().is_ok_and(|map| map.contains_key(&ptr)) {
+        false as c_int
+    } else {
+        ndk_sys::AAsset_isAllocated(aasset)
     }
 }
 
-fn seek_facade(offset: i64, whence: libc::c_int, file: &mut Cursor<Vec<u8>>) -> i64 {
+fn seek_facade(offset: i64, whence: c_int, file: &mut Buffer) -> i64 {
     let offset = match whence {
         libc::SEEK_SET => {
-            let u64_off = match u64::try_from(offset) {
-                Ok(uoff) => uoff,
-                Err(e) => {
-                    log::error!("signed ({offset}) to unsigned failed: {e}");
-                    return -1;
-                }
-            };
+            //Let's check this so we don't mess up
+            let u64_off = handle_result!(u64::try_from(offset));
             io::SeekFrom::Start(u64_off)
         }
         libc::SEEK_CUR => io::SeekFrom::Current(offset),
@@ -1377,16 +1251,10 @@ fn seek_facade(offset: i64, whence: libc::c_int, file: &mut Cursor<Vec<u8>>) -> 
         }
     };
     match file.seek(offset) {
-        Ok(new_offset) => match new_offset.try_into() {
-            Ok(int) => int,
-            Err(err) => {
-                log::error!("u64 ({new_offset}) to i64 failed: {err}");
-                -1
-            }
-        },
+        Ok(new_offset) => handle_result!(new_offset.try_into()),
         Err(err) => {
-            log::error!("aasset seek failed: {err}");
-            -1
+            log::error!("seek Error: {err}");
+            return -1;
         }
     }
 }
