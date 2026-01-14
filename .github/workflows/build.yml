@@ -9,8 +9,6 @@ jobs:
       matrix:
         target: 
           - aarch64-linux-android
-          - x86_64-linux-android
-          - armv7-linux-androideabi
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,5 +25,3 @@ jobs:
         with:
           name: mtbinloader2-${{ matrix.target }}
           path: target/${{ matrix.target }}/githubci/libmtbinloader2.so
-
-

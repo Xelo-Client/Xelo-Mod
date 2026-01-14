@@ -73,4 +73,3 @@ jobs:
         with:
           body: ${{steps.github_release.outputs.changelog}}
           files: libmtbinloader2_${{ matrix.target }}.so
-

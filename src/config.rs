@@ -14,6 +14,9 @@ pub struct ModConfig {
     
     #[serde(rename = "Nofog")]
     pub no_fog: bool,
+
+   #[serde(rename = "better_brightness")]
+    pub better_brightness: bool,
     
     #[serde(rename = "particles_disabler")]
     pub particles_disabler: bool,
@@ -26,9 +29,6 @@ pub struct ModConfig {
     
     #[serde(rename = "classic_skins")]
     pub classic_skins: bool,
-    
-    #[serde(rename = "night_vision")]
-    pub night_vision: bool,
     
     #[serde(rename = "xelo_title")]
     pub xelo_title: bool,
@@ -54,6 +54,9 @@ pub struct ModConfig {
     #[serde(rename = "double_tppview")]
     pub double_tppview: bool,
     
+    #[serde(rename = "custom_cross_hair")]
+    pub custom_cross_hair: bool,
+    
     // You can add more fields as needed
     // #[serde(rename = "CustomField")]
     // pub custom_field: bool,
@@ -64,11 +67,11 @@ impl Default for ModConfig {
         Self {
             no_hurt_cam: false,
             no_fog: false,
+            better_brightness: false,
             particles_disabler: false,
             java_clouds: false,
             java_cubemap: false,
             classic_skins: false,
-            night_vision: false,
             xelo_title: true,
             client_capes: false,
             no_shadows: false,
@@ -77,6 +80,7 @@ impl Default for ModConfig {
             no_pumpkin_overlay: false,
             white_block_outline: false,
             double_tppview: false,
+            custom_cross_hair: false,
         }
     }
 }
@@ -85,10 +89,21 @@ impl Default for ModConfig {
 static CONFIG: OnceLock<ModConfig> = OnceLock::new();
 
 // Config file path
-const CONFIG_DIR: &str = "/storage/emulated/0/Android/data/com.origin.launcher/files/origin_mods";
-const CONFIG_FILE: &str = "/storage/emulated/0/Android/data/com.origin.launcher/files/origin_mods/config.json";
+const CONFIG_DIR: &str = "/storage/emulated/0/games/xelo_client/xelo_mods";
+const CONFIG_FILE: &str = "/storage/emulated/0/games/xelo_client/xelo_mods/config.json";
+const CROSSHAIR_DIR: &str = "/storage/emulated/0/games/xelo_client/custom_cross_hair";
 
 pub fn init_config() {
+    if let Err(e) = fs::create_dir_all(CONFIG_DIR) {
+        log::warn!("Failed to create config directory: {}", e);
+    }
+
+    if let Err(e) = fs::create_dir_all(CROSSHAIR_DIR) {
+        log::warn!("Failed to create custom crosshair directory: {}", e);
+    } else {
+        log::info!("Ensured crosshair directory exists at {}", CROSSHAIR_DIR);
+    }
+
     let config = load_or_create_config();
     CONFIG.set(config).expect("Failed to set config");
 }
@@ -154,6 +169,10 @@ pub fn is_no_fog_enabled() -> bool {
     get_config().no_fog
 }
 
+pub fn is_better_brightness_enabled() -> bool {
+    get_config().better_brightness
+}
+
 pub fn is_particles_disabler_enabled() -> bool {
     get_config().particles_disabler
 }
@@ -168,10 +187,6 @@ pub fn is_java_cubemap_enabled() -> bool {
 
 pub fn is_classic_skins_enabled() -> bool {
     get_config().classic_skins
-}
-
-pub fn is_night_vision_enabled() -> bool {
-    get_config().night_vision
 }
 
 pub fn is_xelo_title_enabled() -> bool {
@@ -204,6 +219,10 @@ pub fn is_no_spyglass_overlay_enabled() -> bool {
 
 pub fn is_double_tppview_enabled() -> bool {
     get_config().double_tppview
+}
+
+pub fn is_custom_cross_hair_enabled() -> bool {
+    get_config().custom_cross_hair
 }
 
 // You can add more helper functions for other config values
