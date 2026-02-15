@@ -4,7 +4,7 @@ use crate::{
     loader::{Buffer, FileLoader},
     LockResultExt,
 };
-use crate::config::{is_no_hurt_cam_enabled, is_no_fog_enabled, is_java_cubemap_enabled, is_particles_disabler_enabled, is_java_clouds_enabled, is_classic_skins_enabled, is_no_shadows_enabled, is_xelo_title_enabled, is_client_capes_enabled, is_block_whiteoutline_enabled, is_no_flipbook_animations_enabled, is_no_spyglass_overlay_enabled, is_no_pumpkin_overlay_enabled, is_double_tppview_enabled,
+use crate::config::{is_no_hurt_cam_enabled, is_particles_disabler_enabled, is_java_clouds_enabled, is_classic_skins_enabled, is_no_shadows_enabled, is_xelo_title_enabled, is_client_capes_enabled, is_block_whiteoutline_enabled, is_no_flipbook_animations_enabled, is_no_spyglass_overlay_enabled, is_no_pumpkin_overlay_enabled, is_double_tppview_enabled,
     is_custom_cross_hair_enabled
 };
 use libc::{c_char, c_int, c_void, off64_t, off_t, size_t};
@@ -43,11 +43,7 @@ pub const CUSTOM_CROSS_HAIR_PNG: &[u8] = include_bytes!("utils/custom_cross_hair
 
 pub const CUSTOM_CROSS_HAIR_PATH: &str = "/storage/emulated/0/games/xelo_client/custom_cross_hair/cross_hair.png";
 
-const NO_FOG_MATERIAL: &[u8] = include_bytes!("utils/no_fog/RenderChunk.material.bin");
-
 const PACK_ICN_PNG: &[u8] = include_bytes!("assets/resources/pack_icon.png");
-
-const LEGACY_CUBEMAP_MATERIAL_BIN: &[u8] = include_bytes!("qol/java_cubemap/LegacyCubemap.material.bin");
 
 const CAPE_TEXTURE_PATH: &str = "/storage/emulated/0/Android/data/com.origin.launcher/files/origin_mods/xelo_cape.png";
 
@@ -96,17 +92,6 @@ const JAVA_CLOUDS_TEXTURE: &[u8] = include_bytes!("Diskksks.png");
 // Xelo constants end
 
 // Xelo fn start
-
-fn get_no_fog_material_data(filename: &str) -> Option<&'static [u8]> {
-    if !is_no_fog_enabled() {
-        return None;
-    }
-
-    match filename {
-        "RenderChunk.material.bin" => Some(NO_FOG_MATERIAL),
-        _ => None,
-    }
-}
 
 fn get_cross_hair_png_data(filename: &str) -> Option<Arc<Vec<u8>>> {
     if !is_custom_cross_hair_enabled() || filename != "cross_hair.png" {
@@ -335,18 +320,7 @@ fn modify_third_person_radius(original_data: &[u8]) -> Option<Vec<u8>> {
     }
 }
 
-fn get_java_cubemap_material_data(filename: &str) -> Option<&'static [u8]> {
-    if !is_java_cubemap_enabled() {
-        return None;
-    }
-    
-    match filename {
-        "LegacyCubemap.material.bin" => Some(LEGACY_CUBEMAP_MATERIAL_BIN),
-        _ => None,
-    }
-}
-
-    fn get_title_png_data(filename: &str) -> Option<&'static [u8]> {
+fn get_title_png_data(filename: &str) -> Option<&'static [u8]> {
     if !is_xelo_title_enabled() {
         return None;
     }
@@ -923,13 +897,6 @@ pub unsafe extern "C" fn open(
         
     // Material replacements
     let filename_str = os_filename.to_string_lossy();
-        if let Some(no_fog_data) = get_no_fog_material_data(&filename_str) {
-        log::info!("Intercepting {} with no-fog material (no-fog enabled)", filename_str);
-        let buffer = no_fog_data.to_vec();
-        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
     if let Some(shadows_material_data) = get_shadows_material_data(&filename_str) {
         log::info!("Intercepting {} with shadow material (noshadows enabled)", filename_str);
         let buffer = shadows_material_data.to_vec();
@@ -957,15 +924,6 @@ if is_particles_disabler_file(c_path) {
     wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
     return aasset;
 }
-
-    
-    if let Some(java_cubemap_data) = get_java_cubemap_material_data(&filename_str) {
-        log::info!("Intercepting {} with java-cubemap material (java-cubemap enabled)", filename_str);
-        let buffer = java_cubemap_data.to_vec();
-        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
-        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
-        return aasset;
-    }
     
     if let Some(title_png_data) = get_title_png_data(&filename_str) {
         log::info!("Intercepting {} with xelo title png (xelo-title enabled)", filename_str);
