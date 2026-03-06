@@ -11,6 +11,7 @@ mod jniopts;
 mod plthook;
 mod config;
 mod brightness;
+mod nametag;
 mod preloader;
 use config::init_config;
 use crate::{loader::ResourcePackManager, plthook::replace_plt_functions};
