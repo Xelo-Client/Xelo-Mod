@@ -23,6 +23,10 @@ static ORIGINAL_BYTES: Mutex<Option<[u8; 4]>> = Mutex::new(None);
 static PATCH_ADDR: Mutex<Option<usize>> = Mutex::new(None);
 
 pub fn patch_nametag() -> Result<(), &'static str> {
+    if ORIGINAL_BYTES.lock().unwrap().is_some() {
+        return Ok(());
+    }
+
     let addr = resolve_signature(NAMETAG_SIGNATURE)
         .ok_or("Signature not found")?;
 
@@ -80,9 +84,12 @@ pub fn unpatch_nametag() -> Result<(), &'static str> {
         clear_cache::clear_cache(patch_addr, patch_addr.add(4));
 
         protect(patch_addr, 4, Protection::READ_EXECUTE).ok();
-
-        Ok(())
     }
+
+    *ORIGINAL_BYTES.lock().unwrap() = None;
+    *PATCH_ADDR.lock().unwrap() = None;
+
+    Ok(())
 }
 
 fn resolve_signature(signature: &str) -> Option<*const u8> {
