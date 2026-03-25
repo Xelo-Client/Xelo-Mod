@@ -7,6 +7,8 @@ use materialbin::{MinecraftVersion, ALL_VERSIONS};
 use std::sync::{LazyLock, Mutex};
 
 use crate::LockResultExt;
+use crate::nametag::{patch_nametag, unpatch_nametag};
+
 pub struct Options {
     pub handle_lightmaps: bool,
     pub handle_texturelods: bool,
@@ -22,7 +24,7 @@ impl Default for Options {
     }
 }
 pub static OPTS: LazyLock<Mutex<Options>> = LazyLock::new(|| Mutex::new(Options::default()));
-//todo
+
 #[no_mangle]
 extern "C" fn Java_com_origin_launcher_shadersactivity_setAutofixVersions(
     mut env: JNIEnv,
@@ -38,7 +40,6 @@ extern "C" fn Java_com_origin_launcher_shadersactivity_setAutofixVersions(
             .get_object_array_element(&versions, index)
             .expect("Error while reading jni array element");
         let string: JString = string.into();
-        //        if !env.is_instance_of(string, "String")
         let sus = env
             .get_string(&string)
             .expect("Error while getting jni string");
@@ -50,17 +51,20 @@ extern "C" fn Java_com_origin_launcher_shadersactivity_setAutofixVersions(
     let mut opts = OPTS.lock().ignore_poison();
     opts.autofixer_versions = rs_versions;
 }
+
 fn version_from_string(string: &str) -> Option<MinecraftVersion> {
     let mcversion = match string {
         "v1.18.30" => MinecraftVersion::V1_18_30,
         "v1.19.60" => MinecraftVersion::V1_19_60,
         "v1.20.80" => MinecraftVersion::V1_20_80,
         "v1.21.20" => MinecraftVersion::V1_21_20,
-        "v1.21.110+" => MinecraftVersion::V1_21_110,
+        "v1.21.110" => MinecraftVersion::V1_21_110,
+        "v26.0.24" => MinecraftVersion::V26_0_24,
         _ => return None,
     };
     Some(mcversion)
 }
+
 #[no_mangle]
 extern "C" fn Java_com_origin_launcher_shadersactivity_setLightmapAutofixer(
     mut _env: JNIEnv,
@@ -70,6 +74,7 @@ extern "C" fn Java_com_origin_launcher_shadersactivity_setLightmapAutofixer(
     let mut opts = OPTS.lock().ignore_poison();
     opts.handle_lightmaps = on == JNI_TRUE;
 }
+
 #[no_mangle]
 extern "C" fn Java_com_origin_launcher_shadersactivity_setTextureLodAutofixer(
     mut _env: JNIEnv,
@@ -78,4 +83,26 @@ extern "C" fn Java_com_origin_launcher_shadersactivity_setTextureLodAutofixer(
 ) {
     let mut opts = OPTS.lock().ignore_poison();
     opts.handle_texturelods = on == JNI_TRUE;
+}
+
+#[no_mangle]
+extern "C" fn Java_com_origin_launcher_Launcher_inbuilt_XeloOverlay_nativemod_NameTagMod_patchNametag(
+    _env: JNIEnv,
+    _class: JObject,
+) -> jboolean {
+    match patch_nametag() {
+        Ok(_) => JNI_TRUE,
+        Err(_) => 0,
+    }
+}
+
+#[no_mangle]
+extern "C" fn Java_com_origin_launcher_Launcher_inbuilt_XeloOverlay_nativemod_NameTagMod_unpatchNametag(
+    _env: JNIEnv,
+    _class: JObject,
+) -> jboolean {
+    match unpatch_nametag() {
+        Ok(_) => JNI_TRUE,
+        Err(_) => 0,
+    }
 }
