@@ -57,6 +57,15 @@ pub struct ModConfig {
     #[serde(rename = "custom_cross_hair")]
     pub custom_cross_hair: bool,
     
+    #[serde(rename = "no_bow_animation")]
+    pub no_bow_animation: bool,
+    
+    #[serde(rename = "no_eating_animation")]
+    pub no_eating_animation: bool,
+    
+    #[serde(rename = "portal_optimizer")]
+    pub portal_optimizer: bool,
+    
     // You can add more fields as needed
     // #[serde(rename = "CustomField")]
     // pub custom_field: bool,
@@ -81,6 +90,9 @@ impl Default for ModConfig {
             white_block_outline: false,
             double_tppview: false,
             custom_cross_hair: false,
+            no_bow_animation: false,
+            no_eating_animation: false,
+            portal_optimizer: false,
         }
     }
 }
@@ -223,6 +235,18 @@ pub fn is_double_tppview_enabled() -> bool {
 
 pub fn is_custom_cross_hair_enabled() -> bool {
     get_config().custom_cross_hair
+}
+
+pub fn is_no_bow_animation() -> bool {
+    get_config().no_bow_animation
+}
+
+pub fn is_portal_optimizer() -> bool {
+    get_config().portal_optimizer
+}
+
+pub fn is_no_eating_animation() -> bool {
+    get_config().no_eating_animation
 }
 
 // You can add more helper functions for other config values
