@@ -322,6 +322,66 @@ fn modify_third_person_radius(original_data: &[u8]) -> Option<Vec<u8>> {
     }
 }
 
+fn remove_eat_animation(original_data: &[u8]) -> Option<Vec<u8>> {
+    let json_str = match std::str::from_utf8(original_data) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("Failed to parse item JSON as UTF-8: {}", e);
+            return None;
+        }
+    };
+
+    let mut root: Value = match serde_json::from_str(json_str) {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Failed to parse item JSON: {}", e);
+            return None;
+        }
+    };
+
+    let mut changed = false;
+
+    remove_eat_recursive(&mut root, &mut changed);
+
+    if !changed {
+        return None; 
+    }
+
+    match serde_json::to_string_pretty(&root) {
+        Ok(s) => {
+            log::info!("Removed minecraft:use_animation eat from item JSON");
+            Some(s.into_bytes())
+        }
+        Err(e) => {
+            log::error!("Failed to re-serialise item JSON: {}", e);
+            None
+        }
+    }
+}
+
+fn remove_eat_recursive(value: &mut Value, changed: &mut bool) {
+    match value {
+        Value::Object(map) => {
+            if map.get("minecraft:use_animation")
+                .and_then(|v| v.as_str())
+                == Some("eat")
+            {
+                map.remove("minecraft:use_animation");
+                *changed = true;
+            }
+            for child in map.values_mut() {
+                remove_eat_recursive(child, changed);
+            }
+        }
+        Value::Array(arr) => {
+            for child in arr.iter_mut() {
+                remove_eat_recursive(child, changed);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn get_title_png_data(filename: &str) -> Option<&'static [u8]> {
     if !is_xelo_title_enabled() {
         return None;
@@ -510,6 +570,55 @@ fn is_bow_render_file(c_path: &Path) -> bool {
     bow_render_file.contains(&filename.as_ref())
 }
 
+fn is_fancy_json_file(c_path: &Path) -> bool {
+    if !is_portal_optimizer() {
+        return false;
+    }
+
+    let path_str = c_path.to_string_lossy();
+
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+
+    if filename != "fancy.json" {
+        return false;
+    }
+
+    let fancy_patterns = [
+        "materials/fancy.json",
+        "/materials/fancy.json",
+        "resource_packs/vanilla/materials/fancy.json",
+        "assets/resource_packs/vanilla/materials/fancy.json",
+        "vanilla/materials/fancy.json",
+        "assets/materials/fancy.json",
+    ];
+
+    fancy_patterns.iter().any(|pattern| {
+        path_str.contains(pattern) || path_str.ends_with(pattern)
+    })
+}
+
+fn is_items_json_file(c_path: &Path) -> bool {
+    if !is_no_eating_animation() {
+        return false;
+    }
+
+    let path_str = c_path.to_string_lossy();
+
+    let extension_ok = c_path
+        .extension()
+        .map(|e| e == "json")
+        .unwrap_or(false);
+
+    if !extension_ok {
+        return false;
+    }
+
+    path_str.contains("/items/") || path_str.contains("\\items\\")
+}
+
 fn is_persona_file_to_block(c_path: &Path) -> bool {
     if !is_classic_skins_enabled() {
         return false;
@@ -530,6 +639,56 @@ fn is_persona_file_to_block(c_path: &Path) -> bool {
     blocked_personas.iter().any(|persona_path| {
         path_str.contains(persona_path) || path_str.ends_with(persona_path)
     })
+}
+
+fn remove_portal_fancy_define(original_data: &[u8]) -> Option<Vec<u8>> {
+    let json_str = match std::str::from_utf8(original_data) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("Failed to parse fancy.json as UTF-8: {}", e);
+            return None;
+        }
+    };
+
+    let mut root: Value = match serde_json::from_str(json_str) {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Failed to parse fancy.json as JSON: {}", e);
+            return None;
+        }
+    };
+
+    let mut changed = false;
+
+    if let Some(arr) = root.as_array_mut() {
+        for entry in arr.iter_mut() {
+            if let Some(obj) = entry.as_object_mut() {
+                let is_portal = obj
+                    .get("path")
+                    .and_then(|v| v.as_str())
+                    == Some("materials/portal.material");
+
+                if is_portal && obj.contains_key("+defines") {
+                    obj.remove("+defines");
+                    changed = true;
+                    log::info!("Removed +defines from portal.material entry in fancy.json");
+                }
+            }
+        }
+    }
+
+    if !changed {
+        log::info!("portal.material +defines entry not found in fancy.json, passing through unchanged");
+        return None;
+    }
+
+    match serde_json::to_string_pretty(&root) {
+        Ok(s) => Some(s.into_bytes()),
+        Err(e) => {
+            log::error!("Failed to re-serialise fancy.json: {}", e);
+            None
+        }
+    }
 }
 
 
@@ -983,6 +1142,60 @@ if is_particles_disabler_file(c_path) {
     return aasset;
 }
 
+if is_items_json_file(c_path) {
+        log::info!("Checking item file for eat animation: {}", c_path.display());
+
+        if !aasset.is_null() {
+            let length = ndk_sys::AAsset_getLength(aasset) as usize;
+            if length > 0 {
+                let mut original_data = vec![0u8; length];
+                let bytes_read = ndk_sys::AAsset_read(
+                    aasset,
+                    original_data.as_mut_ptr() as *mut libc::c_void,
+                    length,
+                );
+
+                if bytes_read == length as i32 {
+                    ndk_sys::AAsset_seek(aasset, 0, libc::SEEK_SET);
+
+                    if let Some(modified_data) = remove_eat_animation(&original_data) {
+                        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
+                        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(modified_data));
+                    }
+                }
+            }
+        }
+
+        return aasset;
+    }
+    
+    if is_fancy_json_file(c_path) {
+        log::info!("Checking fancy.json for portal optimizer: {}", c_path.display());
+
+        if !aasset.is_null() {
+            let length = ndk_sys::AAsset_getLength(aasset) as usize;
+            if length > 0 {
+                let mut original_data = vec![0u8; length];
+                let bytes_read = ndk_sys::AAsset_read(
+                    aasset,
+                    original_data.as_mut_ptr() as *mut libc::c_void,
+                    length,
+                );
+
+                if bytes_read == length as i32 {
+                    ndk_sys::AAsset_seek(aasset, 0, libc::SEEK_SET);
+
+                    if let Some(modified_data) = remove_portal_fancy_define(&original_data) {
+                        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
+                        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(modified_data));
+                    }
+                }
+            }
+        }
+
+        return aasset;
+    }
+
 if pack_icn_file(c_path) {
     log::info!("Intercepting with pack icon: {}", c_path.display());
     let buffer = PACK_ICN_PNG.to_vec();
@@ -991,7 +1204,6 @@ if pack_icn_file(c_path) {
     return aasset;
 }
     
-// Xelo end
     
     let mut sus = MC_FILELOADER.lock().ignore_poison();
     if let Some(yay) = sus.get_file(c_path, manager) {
