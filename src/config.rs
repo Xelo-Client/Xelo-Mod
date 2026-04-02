@@ -66,6 +66,9 @@ pub struct ModConfig {
     #[serde(rename = "portal_optimizer")]
     pub portal_optimizer: bool,
     
+    #[serde(rename = "psm")]
+    pub psm: bool,
+    
     // You can add more fields as needed
     // #[serde(rename = "CustomField")]
     // pub custom_field: bool,
@@ -93,6 +96,7 @@ impl Default for ModConfig {
             no_bow_animation: false,
             no_eating_animation: false,
             portal_optimizer: false,
+            psm: false,
         }
     }
 }
@@ -247,6 +251,10 @@ pub fn is_portal_optimizer() -> bool {
 
 pub fn is_no_eating_animation() -> bool {
     get_config().no_eating_animation
+}
+
+pub fn is_psm_enabled() -> bool {
+    get_config().psm
 }
 
 // You can add more helper functions for other config values

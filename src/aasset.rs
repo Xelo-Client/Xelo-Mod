@@ -5,7 +5,7 @@ use crate::{
     LockResultExt,
 };
 use crate::config::{is_no_hurt_cam_enabled, is_particles_disabler_enabled, is_java_clouds_enabled, is_classic_skins_enabled, is_no_shadows_enabled, is_xelo_title_enabled, is_client_capes_enabled, is_block_whiteoutline_enabled, is_no_flipbook_animations_enabled, is_no_spyglass_overlay_enabled, is_no_pumpkin_overlay_enabled, is_double_tppview_enabled,
-    is_custom_cross_hair_enabled, is_no_eating_animation, is_portal_optimizer, is_no_bow_animation
+    is_custom_cross_hair_enabled, is_no_eating_animation, is_portal_optimizer, is_no_bow_animation, is_psm_enabled
 };
 use libc::{c_char, c_int, c_void, off64_t, off_t, size_t};
 use ndk_sys::{AAsset, AAssetManager};
@@ -84,6 +84,84 @@ const RENDER_JSON: &str = r#"{
             ]
         }
     }
+}"#;
+
+const PSM_PARTICLES_MATERIAL: &str = r#"{
+  "materials": {
+    "version": "1.0.0",
+
+    "particles_base": {
+      "vertexShader": "shaders/color_uv.vertex",
+      "vrGeometryShader": "shaders/color_uv.geometry",
+      "fragmentShader": "shaders/color_texture.fragment",
+
+      "vertexFields": [
+        { "field": "Position" },
+        { "field": "Color" },
+        { "field": "UV0" }
+      ],
+
+      "+samplerStates": [
+        {
+          "samplerIndex": 0,
+          "textureFilter": "Point"
+        }
+      ],
+
+      "msaaSupport": "Both"
+    },
+
+    "particles_opaque:particles_base": {
+      "+states": [ "DisableAlphaWrite" ]
+    },
+
+    "particles_alpha:particles_base": {
+      "+defines": [ "ALPHA_TEST" ],
+      "+states": [ "DisableAlphaWrite" ]
+    },
+
+    "particles_blend:particles_base": {
+      "+states": [
+        "Blending",
+        "DisableDepthWrite"
+      ]
+    },
+
+    "particles_effects:particles_alpha": {
+      "+defines": [ "EFFECTS_OFFSET" ],
+      "msaaSupport": "Both"
+    },
+
+    "particles_add:particles_blend": {
+      "blendSrc": "SourceAlpha",
+      "blendDst": "One"
+    },
+
+    "particles_random_test": {
+      "vertexShader": "shaders/particle_random_test.vertex",
+      "vrGeometryShader": "shaders/color_uv.geometry",
+      "fragmentShader": "shaders/color_texture.fragment",
+
+      "vertexFields": [
+        { "field": "Position" },
+        { "field": "Color" },
+        { "field": "Normal" },
+        { "field": "UV0" }
+      ],
+
+      "+samplerStates": [
+        {
+          "samplerIndex": 0,
+          "textureFilter": "Point"
+        }
+      ],
+
+      "+defines": [ "ALPHA_TEST" ],
+      "+states": [ "DisableAlphaWrite" ],
+
+      "msaaSupport": "Both"
+    }
+  }
 }"#;
 
 const CLASSIC_STEVE_TEXTURE: &[u8] = include_bytes!("s.png");
@@ -501,6 +579,36 @@ fn is_classic_skins_steve_texture_file(c_path: &Path) -> bool {
     is_skin_file_path(c_path, "steve.png")
 }
 
+fn is_psm_particles_material_file(c_path: &Path) -> bool {
+    if !is_particles_disabler_enabled() {
+        return false;
+    }
+
+    let path_str = c_path.to_string_lossy();
+
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+
+    if filename != "particles.material" {
+        return false;
+    }
+
+    let particles_material_patterns = [
+        "materials/particles.material",
+        "/materials/particles.material",
+        "resource_packs/vanilla/materials/particles.material",
+        "assets/resource_packs/vanilla/materials/particles.material",
+        "vanilla/materials/particles.material",
+        "assets/materials/particles.material",
+    ];
+
+    particles_material_patterns.iter().any(|pattern| {
+        path_str.contains(pattern) || path_str.ends_with(pattern)
+    })
+}
+
 fn is_classic_skins_alex_texture_file(c_path: &Path) -> bool {
     if !is_classic_skins_enabled() {
         return false;
@@ -887,6 +995,14 @@ pub unsafe extern "C" fn open(
             }
             return std::ptr::null_mut();
         }
+    }
+    
+    if is_psm_particles_material_file(c_path) {
+        log::info!("PSM: Intercepting particles.material with single-mapping replacement: {}", c_path.display());
+        let buffer = PSM_PARTICLES_MATERIAL.as_bytes().to_vec();
+        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
     }
 
     // Block persona files if classic skins enabled
