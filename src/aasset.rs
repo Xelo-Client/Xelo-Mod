@@ -5,21 +5,13 @@ use crate::{
     LockResultExt,
 };
 use crate::config::{is_no_hurt_cam_enabled, is_particles_disabler_enabled, is_java_clouds_enabled, is_classic_skins_enabled, is_no_shadows_enabled, is_xelo_title_enabled, is_client_capes_enabled, is_block_whiteoutline_enabled, is_no_flipbook_animations_enabled, is_no_spyglass_overlay_enabled, is_no_pumpkin_overlay_enabled, is_double_tppview_enabled,
-    is_custom_cross_hair_enabled, is_no_eating_animation, is_portal_optimizer, is_no_bow_animation, is_psm_enabled
+    is_custom_cross_hair_enabled, is_no_eating_animation, is_portal_optimizer, is_no_bow_animation, is_psm_enabled, is_no_weather_enabled, is_no_sunmoon_enabled, is_no_stars_enabled
 };
 use libc::{c_char, c_int, c_void, off64_t, off_t, size_t};
-use ndk_sys::{AAsset, AAssetManager};
+use ndk_sys::{AAsset, AAssetManager, acamera_metadata_enum_acamera_depth_available_depth_stream_configurations};
 use once_cell::sync::Lazy;
 use std::{
-    cell::UnsafeCell,
-    collections::HashMap,
-    ffi::{CStr, CString, OsStr},
-    io::{self, Cursor, Read, Seek, Write},
-    os::unix::ffi::OsStrExt,
-    path::{Path, PathBuf},
-    //    ptr,
-    fs,
-    sync::{LazyLock, Mutex, Arc, OnceLock},
+    cell::UnsafeCell, collections::HashMap, ffi::{CStr, CString, OsStr}, fs, io::{self, Cursor, Read, Seek, Write}, os::unix::ffi::OsStrExt, path::{Path, PathBuf}, sync::{Arc, LazyLock, Mutex, OnceLock}
 };
 use serde_json::{Value, Map};
 
@@ -302,6 +294,118 @@ fn is_particles_disabler_file(c_path: &Path) -> bool {
     patterns.iter().any(|pattern| path_str.contains(pattern) || path_str.ends_with(pattern))
 }
 
+fn is_no_weather_file(c_path: &Path) -> bool {
+    if !is_no_weather_enabled() {
+        return false;
+    }
+    
+    let path_str = c_path.to_string_lossy();
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+
+    let fname = filename.as_ref();
+    if fname != "Weather.material.bin"
+    && fname != "WeatherForwardPBR.material.bin"
+    {
+        return false;
+    }
+
+    let patterns = [
+        // Weather.material.bin patterns
+        "materials/Weather.material.bin",
+        "/materials/Weather.material.bin",
+        "resource_packs/vanilla/materials/Weather.material.bin",
+        "assets/resource_packs/vanilla/materials/Weather.material.bin",
+        "vanilla/materials/Weather.material.bin",
+        "assets/materials/Weather.material.bin",
+
+        // WeatherForwardPBR.material.bin
+        "materials/WeatherForwardPBR.material.bin",
+        "/materials/WeatherForwardPBR.material.bin",
+        "resource_packs/vanilla/materials/WeatherForwardPBR.material.bin",
+        "assets/resource_packs/vanilla/materials/WeatherForwardPBR.material.bin",
+        "vanilla/materials/WeatherForwardPBR.material.bin",
+        "assets/materials/WeatherForwardPBR.material.bin",
+    ];
+
+    patterns.iter().any(|pattern| path_str.contains(pattern) || path_str.ends_with(pattern))
+}
+
+fn is_no_sunmoon_file(c_path: &Path) -> bool {
+    if !is_no_sunmoon_enabled() {
+        return false;
+    }
+
+    let path_str = c_path.to_string_lossy();
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+
+    let fname = filename.as_ref();
+    if fname != "SunMoon.material.bin"
+    && fname != "SunMoonForwardPBR.material.bin"
+    {
+        return false;
+    }
+
+    let patterns = [
+        "materials/SunMoon.material.bin",
+        "/materials/SunMoon.material.bin",
+        "resource_packs/vanilla/materials/SunMoon.material.bin",
+        "assets/resource_packs/vanilla/materials/SunMoon.material.bin",
+        "vanilla/materials/SunMoon.material.bin",
+        "assets/materials/SunMoon.material.bin",
+
+        "materials/SunMoonForwardPBR.material.bin",
+        "/materials/SunMoonForwardPBR.material.bin",
+        "resource_packs/vanilla/materials/SunMoonForwardPBR.material.bin",
+        "assets/resource_packs/vanilla/materials/SunMoonForwardPBR.material.bin",
+        "vanilla/materials/SunMoonForwardPBR.material.bin",
+        "assets/materials/SunMoonForwardPBR.material.bin",
+    ];
+
+    patterns.iter().any(|pattern| path_str.contains(pattern) || path_str.ends_with(pattern))
+}
+
+fn is_no_stars_file(c_path: &Path) -> bool {
+    if !is_no_stars_enabled() {
+        return false;
+    }
+
+    let path_str = c_path.to_string_lossy();
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+
+    let fname = filename.as_ref();
+    if fname != "Stars.material.bin"
+    && fname != "StarsForwardPBR.material.bin"
+    {
+        return false;
+    }
+
+    let patterns = [
+        "materials/Stars.material.bin",
+        "/materials/Stars.material.bin",
+        "resource_packs/vanilla/materials/Stars.material.bin",
+        "assets/resource_packs/vanilla/materials/Stars.material.bin",
+        "vanilla/materials/Stars.material.bin",
+        "assets/materials/Stars.material.bin",
+
+        "materials/StarsForwardPBR.material.bin",
+        "/materials/StarsForwardPBR.material.bin",
+        "resource_packs/vanilla/materials/StarsForwardPBR.material.bin",
+        "assets/resource_packs/vanilla/materials/StarsForwardPBR.material.bin",
+        "vanilla/materials/StarsForwardPBR.material.bin",
+        "assets/materials/StarsForwardPBR.material.bin",
+    ];
+
+    patterns.iter().any(|pattern| path_str.contains(pattern) || path_str.ends_with(pattern))
+}
 
 fn is_third_person_camera_file(c_path: &Path) -> bool {
     if !is_double_tppview_enabled() {
@@ -1220,6 +1324,39 @@ if is_particles_disabler_file(c_path) {
     // Combine all particle material buffers
     let buffer = Vec::new();
     
+    let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
+    wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+    return aasset;
+}
+
+if is_no_weather_file(c_path) {
+    log::info!("Intercepting Weather material file with combined replacement: {}", c_path.display());
+
+    // Combine bla bla buffers
+    let buffer = Vec::new();
+
+    let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
+    wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+    return aasset;
+}
+
+if is_no_sunmoon_file(c_path) {
+    log::info!("gooning Sun and Moon file and bla bla bla replacement: {}", c_path.display());
+
+    // no need comment lol 
+    let buffer = Vec::new();
+
+    let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
+    wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+    return aasset;
+}
+
+if is_no_stars_file(c_path) {
+    log::info!("shit here we go again with stars material: {}", c_path.display());
+
+    // do i need to Repeat that sentence
+    let buffer = Vec::new();
+
     let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
     wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
     return aasset;

@@ -68,6 +68,15 @@ pub struct ModConfig {
     
     #[serde(rename = "psm")]
     pub psm: bool,
+
+    #[serde(rename = "no_weather")]
+    pub no_weather: bool,
+
+    #[serde(rename = "no_stars")]
+    pub no_stars: bool,
+
+    #[serde(rename = "no_sun&moon")]
+    pub no_sun_moon: bool,
     
     // You can add more fields as needed
     // #[serde(rename = "CustomField")]
@@ -97,6 +106,9 @@ impl Default for ModConfig {
             no_eating_animation: false,
             portal_optimizer: false,
             psm: false,
+            no_weather: false,
+            no_stars: false,
+            no_sun_moon: false,
         }
     }
 }
@@ -255,6 +267,18 @@ pub fn is_no_eating_animation() -> bool {
 
 pub fn is_psm_enabled() -> bool {
     get_config().psm
+}
+
+pub fn is_no_weather_enabled() -> bool {
+    get_config().no_weather
+}
+
+pub fn is_no_stars_enabled() -> bool {
+    get_config().no_stars
+}
+
+pub fn is_no_sunmoon_enabled() -> bool {
+    get_config().no_sun_moon
 }
 
 // You can add more helper functions for other config values
