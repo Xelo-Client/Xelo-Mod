@@ -11,7 +11,7 @@ use libc::{c_char, c_int, c_void, off64_t, off_t, size_t};
 use ndk_sys::{AAsset, AAssetManager, acamera_metadata_enum_acamera_depth_available_depth_stream_configurations};
 use once_cell::sync::Lazy;
 use std::{
-    cell::UnsafeCell, collections::HashMap, ffi::{CStr, CString, OsStr}, fs, io::{self, Cursor, Read, Seek, Write}, os::unix::ffi::OsStrExt, path::{Path, PathBuf}, str::pattern::Pattern, sync::{Arc, LazyLock, Mutex, OnceLock}
+    cell::UnsafeCell, collections::HashMap, ffi::{CStr, CString, OsStr}, fs, io::{self, Cursor, Read, Seek, Write}, os::unix::ffi::OsStrExt, path::{Path, PathBuf}, sync::{Arc, LazyLock, Mutex, OnceLock}
 };
 use serde_json::{Value, Map};
 
