@@ -5,7 +5,7 @@ use crate::{
     LockResultExt,
 };
 use crate::config::{is_no_hurt_cam_enabled, is_particles_disabler_enabled, is_java_clouds_enabled, is_classic_skins_enabled, is_no_shadows_enabled, is_xelo_title_enabled, is_client_capes_enabled, is_block_whiteoutline_enabled, is_no_flipbook_animations_enabled, is_no_spyglass_overlay_enabled, is_no_pumpkin_overlay_enabled, is_double_tppview_enabled,
-    is_custom_cross_hair_enabled
+    is_custom_cross_hair_enabled, is_no_eating_animation, is_portal_optimizer, is_no_bow_animation, is_psm_enabled
 };
 use libc::{c_char, c_int, c_void, off64_t, off_t, size_t};
 use ndk_sys::{AAsset, AAssetManager};
@@ -65,6 +65,8 @@ const CUSTOM_SKINS_JSON: &str = r#"{"skins":[{"localization_name":"Steve","geome
 
 const CUSTOM_BLOCKOUTLINE: &str = r#"{"materials":{"block_overlay":{"+states":["Blending","DisableDepthWrite","DisableAlphaWrite","StencilWrite","EnableStencilTest"],"backFace":{"stencilDepthFailOp":"Keep","stencilFailOp":"Keep","stencilFunc":"NotEqual","stencilPassOp":"Replace"},"depthBias":100.0,"depthBiasOGL":100.0,"depthFunc":"LessEqual","fragmentShader":"shaders/texture_cutout.fragment","frontFace":{"stencilDepthFailOp":"Keep","stencilFailOp":"Keep","stencilFunc":"NotEqual","stencilPassOp":"Replace"},"msaaSupport":"Both","slopeScaledDepthBias":15.0,"slopeScaledDepthBiasOGL":20.0,"stencilReadMask":2,"stencilRef":2,"stencilWriteMask":2,"variants":[{"skinning":{"+defines":["USE_SKINNING"],"vertexFields":[{"field":"Position"},{"field":"BoneId0"},{"field":"UV1"},{"field":"UV0"}]}}],"vertexFields":[{"field":"Position"},{"field":"UV1"},{"field":"UV0"}],"vertexShader":"shaders/uv.vertex","vrGeometryShader":"shaders/uv.geometry"},"cracks_overlay:block_overlay":{"+samplerStates":[{"samplerIndex":0,"textureFilter":"Point"}],"blendDst":"Zero","blendSrc":"DestColor","depthFunc":"LessEqual","fragmentShader":"shaders/texture.fragment"},"cracks_overlay_alpha_test:cracks_overlay":{"+defines":["ALPHA_TEST"],"+states":["DisableCulling"]},"cracks_overlay_tile_entity:cracks_overlay":{"+samplerStates":[{"samplerIndex":0,"textureWrap":"Repeat"}],"variants":[{"skinning":{"+defines":["USE_SKINNING"],"vertexFields":[{"field":"Position"},{"field":"BoneId0"},{"field":"Normal"},{"field":"UV0"}]}}],"vertexFields":[{"field":"Position"},{"field":"Normal"},{"field":"UV0"}],"vertexShader":"shaders/uv_scale.vertex","vrGeometryShader":"shaders/uv.geometry"},"debug":{"depthFunc":"LessEqual","fragmentShader":"shaders/color.fragment","msaaSupport":"Both","vertexFields":[{"field":"Position"},{"field":"Color"}],"vertexShader":"shaders/color.vertex","vrGeometryShader":"shaders/color.geometry"},"fullscreen_cube_overlay":{"+samplerStates":[{"samplerIndex":0,"textureFilter":"Point"}],"depthFunc":"Always","fragmentShader":"shaders/texture_ccolor.fragment","msaaSupport":"Both","vertexFields":[{"field":"Position"},{"field":"UV0"}],"vertexShader":"shaders/uv.vertex","vrGeometryShader":"shaders/uv.geometry"},"fullscreen_cube_overlay_blend:fullscreen_cube_overlay":{"+states":["Blending"]},"fullscreen_cube_overlay_opaque:fullscreen_cube_overlay":{"+states":["DisableCulling"]},"lightning":{"+states":["DisableCulling","Blending"],"blendDst":"One","blendSrc":"SourceAlpha","depthFunc":"LessEqual","fragmentShader":"shaders/lightning.fragment","msaaSupport":"Both","vertexFields":[{"field":"Position"},{"field":"Color"}],"vertexShader":"shaders/color.vertex","vrGeometryShader":"shaders/color.geometry"},"name_tag":{"+states":["Blending","DisableDepthWrite"],"depthFunc":"Always","vertexShader":"shaders/position.vertex","vrGeometryShader":"shaders/position.geometry","fragmentShader":"shaders/current_color.fragment","vertexFields":[{ "field":"Position"}],"+samplerStates":[{"samplerIndex":0,"textureFilter":"Point"}],"msaaSupport":"Both"},"name_tag_depth_tested:name_tag":{"depthFunc":"LessEqual"},"name_tag_alpha_tested:name_tag":{"+defines":[ "ALPHA_TEST" ],"depthFunc":"LessEqual","-states":["Blending","DisableDepthWrite"]},    "name_tag_text":{"+states":["Blending"],"depthFunc":"Always","msaaSupport":"Both"},"name_text_depth_tested:sign_text":{},"overlay_quad":{"+samplerStates":[{"samplerIndex":0,"textureFilter":"Bilinear"}],"+states":["DisableCulling","DisableDepthWrite","Blending"],"blendDst":"OneMinusSrcAlpha","blendSrc":"SourceAlpha","depthFunc":"Always","fragmentShader":"shaders/texture_raw_alphatest.fragment","vertexFields":[{"field":"Position"},{"field":"UV0"}],"vertexShader":"shaders/uv.vertex","vrGeometryShader":"shaders/uv.geometry"},"overlay_quad_clear":{"depthFunc":"Always","fragmentShader":"shaders/color.fragment","msaaSupport":"Both","vertexFields":[{"field":"Position"}],"vertexShader":"shaders/simple.vertex","vrGeometryShader":"shaders/color.geometry"},"plankton:precipitation":{"+defines":["COMFORT_MODE","FLIP_OCCLUSION","NO_VARIETY"]},"precipitation":{"+defines":["COMFORT_MODE"],"+samplerStates":[{"samplerIndex":0,"textureFilter":"Point"},{"samplerIndex":1,"textureFilter":"Point"},{"samplerIndex":2,"textureFilter":"Bilinear"}],"+states":["DisableCulling","DisableDepthWrite","Blending"],"blendDst":"OneMinusSrcAlpha","blendSrc":"SourceAlpha","depthFunc":"LessEqual","fragmentShader":"shaders/rain_snow.fragment","msaaSupport":"Both","vertexFields":[{"field":"Position"},{"field":"Color"},{"field":"UV0"}],"vertexShader":"shaders/rain_snow.vertex","vrGeometryShader":"shaders/rain_snow.geometry"},"rain:precipitation":{},"selection_box":{"+defines":["LINE_STRIP"],"depthFunc":"LessEqual","fragmentShader":"shaders/selection_box.fragment","msaaSupport":"Both","primitiveMode":"Line","vertexFields":[{"field":"Position"}],"vertexShader":"shaders/selection_box.vertex","vrGeometryShader":"shaders/position.geometry"},"selection_overlay:block_overlay":{"blendDst":"SourceColor","blendSrc":"DestColor","vertexShader":"shaders/uv_selection_overlay.vertex"},"selection_overlay_alpha:selection_overlay_level":{"vertexFields":[{"field":"Position"},{"field":"UV1"},{"field":"UV0"}]},"selection_overlay_block_entity:selection_overlay":{"variants":[{"skinning":{"+defines":["USE_SKINNING"],"vertexFields":[{"field":"Position"},{"field":"BoneId0"},{"field":"Normal"},{"field":"UV0"}]},"skinning_color":{"+defines":["USE_SKINNING"],"vertexFields":[{"field":"Position"},{"field":"BoneId0"},{"field":"Color"},{"field":"Normal"},{"field":"UV0"}]}}],"vertexFields":[{"field":"Position"},{"field":"Normal"},{"field":"UV0"}]},"selection_overlay_double_sided:selection_overlay":{"+states":["DisableCulling"]},"selection_overlay_item:selection_overlay":{},"selection_overlay_level:selection_overlay":{"msaaSupport":"Both","vertexFields":[{"field":"Position"},{"field":"Normal"},{"field":"UV0"}]},"selection_overlay_opaque:selection_overlay":{"fragmentShader":"shaders/current_color.fragment","msaaSupport":"Both","vertexShader":"shaders/selection_box.vertex","vrGeometryShader":"shaders/position.geometry"},"sign_text":{"+defines":["ALPHA_TEST","USE_LIGHTING"],"+samplerStates":[{"samplerIndex":0,"textureFilter":"Point"}],"+states":["Blending"],"depthBias":10.0,"depthBiasOGL":10.0,"depthFunc":"LessEqual","fragmentShader":"shaders/text.fragment","msaaSupport":"Both","slopeScaledDepthBias":2.0,"slopeScaledDepthBiasOGL":10.0,"vertexFields":[{"field":"Position"},{"field":"Color"},{"field":"UV0"}],"vertexShader":"shaders/color_uv.vertex","vrGeometryShader":"shaders/color_uv.geometry"},"snow:precipitation":{"+defines":["SNOW"]},"version":"1.0.0"}}"#;
 
+const CUSTOM_BOW_RENDER_CONTROLLER: &str = r#"{"format_version":"1.10","render_controllers":{"controller.render.bow":{"arrays":{"textures":{"array.bow_texture_frames":["texture.default"]},"geometries":{"array.bow_geo_frames":["geometry.default"]}},"geometry":"array.bow_geo_frames[query.get_animation_frame]","materials":[{"*":"variable.is_enchanted ? material.enchanted : material.default"}],"textures":["array.bow_texture_frames[query.get_animation_frame]","texture.enchanted"]}}}"#;
+
 // Fixed render controller JSON with proper format and indentation
 const RENDER_JSON: &str = r#"{
     "format_version": "1.8.0",
@@ -82,6 +84,84 @@ const RENDER_JSON: &str = r#"{
             ]
         }
     }
+}"#;
+
+const PSM_PARTICLES_MATERIAL: &str = r#"{
+  "materials": {
+    "version": "1.0.0",
+
+    "particles_base": {
+      "vertexShader": "shaders/color_uv.vertex",
+      "vrGeometryShader": "shaders/color_uv.geometry",
+      "fragmentShader": "shaders/color_texture.fragment",
+
+      "vertexFields": [
+        { "field": "Position" },
+        { "field": "Color" },
+        { "field": "UV0" }
+      ],
+
+      "+samplerStates": [
+        {
+          "samplerIndex": 0,
+          "textureFilter": "Point"
+        }
+      ],
+
+      "msaaSupport": "Both"
+    },
+
+    "particles_opaque:particles_base": {
+      "+states": [ "DisableAlphaWrite" ]
+    },
+
+    "particles_alpha:particles_base": {
+      "+defines": [ "ALPHA_TEST" ],
+      "+states": [ "DisableAlphaWrite" ]
+    },
+
+    "particles_blend:particles_base": {
+      "+states": [
+        "Blending",
+        "DisableDepthWrite"
+      ]
+    },
+
+    "particles_effects:particles_alpha": {
+      "+defines": [ "EFFECTS_OFFSET" ],
+      "msaaSupport": "Both"
+    },
+
+    "particles_add:particles_blend": {
+      "blendSrc": "SourceAlpha",
+      "blendDst": "One"
+    },
+
+    "particles_random_test": {
+      "vertexShader": "shaders/particle_random_test.vertex",
+      "vrGeometryShader": "shaders/color_uv.geometry",
+      "fragmentShader": "shaders/color_texture.fragment",
+
+      "vertexFields": [
+        { "field": "Position" },
+        { "field": "Color" },
+        { "field": "Normal" },
+        { "field": "UV0" }
+      ],
+
+      "+samplerStates": [
+        {
+          "samplerIndex": 0,
+          "textureFilter": "Point"
+        }
+      ],
+
+      "+defines": [ "ALPHA_TEST" ],
+      "+states": [ "DisableAlphaWrite" ],
+
+      "msaaSupport": "Both"
+    }
+  }
 }"#;
 
 const CLASSIC_STEVE_TEXTURE: &[u8] = include_bytes!("s.png");
@@ -320,6 +400,66 @@ fn modify_third_person_radius(original_data: &[u8]) -> Option<Vec<u8>> {
     }
 }
 
+fn remove_eat_animation(original_data: &[u8]) -> Option<Vec<u8>> {
+    let json_str = match std::str::from_utf8(original_data) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("Failed to parse item JSON as UTF-8: {}", e);
+            return None;
+        }
+    };
+
+    let mut root: Value = match serde_json::from_str(json_str) {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Failed to parse item JSON: {}", e);
+            return None;
+        }
+    };
+
+    let mut changed = false;
+
+    remove_eat_recursive(&mut root, &mut changed);
+
+    if !changed {
+        return None; 
+    }
+
+    match serde_json::to_string_pretty(&root) {
+        Ok(s) => {
+            log::info!("Removed minecraft:use_animation eat from item JSON");
+            Some(s.into_bytes())
+        }
+        Err(e) => {
+            log::error!("Failed to re-serialise item JSON: {}", e);
+            None
+        }
+    }
+}
+
+fn remove_eat_recursive(value: &mut Value, changed: &mut bool) {
+    match value {
+        Value::Object(map) => {
+            if map.get("minecraft:use_animation")
+                .and_then(|v| v.as_str())
+                == Some("eat")
+            {
+                map.remove("minecraft:use_animation");
+                *changed = true;
+            }
+            for child in map.values_mut() {
+                remove_eat_recursive(child, changed);
+            }
+        }
+        Value::Array(arr) => {
+            for child in arr.iter_mut() {
+                remove_eat_recursive(child, changed);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn get_title_png_data(filename: &str) -> Option<&'static [u8]> {
     if !is_xelo_title_enabled() {
         return None;
@@ -439,6 +579,36 @@ fn is_classic_skins_steve_texture_file(c_path: &Path) -> bool {
     is_skin_file_path(c_path, "steve.png")
 }
 
+fn is_psm_particles_material_file(c_path: &Path) -> bool {
+    if !is_particles_disabler_enabled() {
+        return false;
+    }
+
+    let path_str = c_path.to_string_lossy();
+
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+
+    if filename != "particles.material" {
+        return false;
+    }
+
+    let particles_material_patterns = [
+        "materials/particles.material",
+        "/materials/particles.material",
+        "resource_packs/vanilla/materials/particles.material",
+        "assets/resource_packs/vanilla/materials/particles.material",
+        "vanilla/materials/particles.material",
+        "assets/materials/particles.material",
+    ];
+
+    particles_material_patterns.iter().any(|pattern| {
+        path_str.contains(pattern) || path_str.ends_with(pattern)
+    })
+}
+
 fn is_classic_skins_alex_texture_file(c_path: &Path) -> bool {
     if !is_classic_skins_enabled() {
         return false;
@@ -484,12 +654,77 @@ fn is_outline_material_file(c_path: &Path) -> bool {
         None => return false,
     };
     
-    // Check for cape render controller files
     let outline_material_files = [
         "ui3D.material"
     ];
     
     outline_material_files.contains(&filename.as_ref())
+}
+
+fn is_bow_render_file(c_path: &Path) -> bool {
+    if !is_no_bow_animation() {
+        return false;
+    }
+    
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+    
+    let bow_render_file = [
+        "bow.render_controllers.json"
+    ];
+    
+    bow_render_file.contains(&filename.as_ref())
+}
+
+fn is_fancy_json_file(c_path: &Path) -> bool {
+    if !is_portal_optimizer() {
+        return false;
+    }
+
+    let path_str = c_path.to_string_lossy();
+
+    let filename = match c_path.file_name() {
+        Some(name) => name.to_string_lossy(),
+        None => return false,
+    };
+
+    if filename != "fancy.json" {
+        return false;
+    }
+
+    let fancy_patterns = [
+        "materials/fancy.json",
+        "/materials/fancy.json",
+        "resource_packs/vanilla/materials/fancy.json",
+        "assets/resource_packs/vanilla/materials/fancy.json",
+        "vanilla/materials/fancy.json",
+        "assets/materials/fancy.json",
+    ];
+
+    fancy_patterns.iter().any(|pattern| {
+        path_str.contains(pattern) || path_str.ends_with(pattern)
+    })
+}
+
+fn is_items_json_file(c_path: &Path) -> bool {
+    if !is_no_eating_animation() {
+        return false;
+    }
+
+    let path_str = c_path.to_string_lossy();
+
+    let extension_ok = c_path
+        .extension()
+        .map(|e| e == "json")
+        .unwrap_or(false);
+
+    if !extension_ok {
+        return false;
+    }
+
+    path_str.contains("/items/") || path_str.contains("\\items\\")
 }
 
 fn is_persona_file_to_block(c_path: &Path) -> bool {
@@ -512,6 +747,56 @@ fn is_persona_file_to_block(c_path: &Path) -> bool {
     blocked_personas.iter().any(|persona_path| {
         path_str.contains(persona_path) || path_str.ends_with(persona_path)
     })
+}
+
+fn remove_portal_fancy_define(original_data: &[u8]) -> Option<Vec<u8>> {
+    let json_str = match std::str::from_utf8(original_data) {
+        Ok(s) => s,
+        Err(e) => {
+            log::error!("Failed to parse fancy.json as UTF-8: {}", e);
+            return None;
+        }
+    };
+
+    let mut root: Value = match serde_json::from_str(json_str) {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Failed to parse fancy.json as JSON: {}", e);
+            return None;
+        }
+    };
+
+    let mut changed = false;
+
+    if let Some(arr) = root.as_array_mut() {
+        for entry in arr.iter_mut() {
+            if let Some(obj) = entry.as_object_mut() {
+                let is_portal = obj
+                    .get("path")
+                    .and_then(|v| v.as_str())
+                    == Some("materials/portal.material");
+
+                if is_portal && obj.contains_key("+defines") {
+                    obj.remove("+defines");
+                    changed = true;
+                    log::info!("Removed +defines from portal.material entry in fancy.json");
+                }
+            }
+        }
+    }
+
+    if !changed {
+        log::info!("portal.material +defines entry not found in fancy.json, passing through unchanged");
+        return None;
+    }
+
+    match serde_json::to_string_pretty(&root) {
+        Ok(s) => Some(s.into_bytes()),
+        Err(e) => {
+            log::error!("Failed to re-serialise fancy.json: {}", e);
+            None
+        }
+    }
 }
 
 
@@ -711,6 +996,14 @@ pub unsafe extern "C" fn open(
             return std::ptr::null_mut();
         }
     }
+    
+    if is_psm_particles_material_file(c_path) {
+        log::info!("PSM: Intercepting particles.material with single-mapping replacement: {}", c_path.display());
+        let buffer = PSM_PARTICLES_MATERIAL.as_bytes().to_vec();
+        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
 
     // Block persona files if classic skins enabled
     if is_persona_file_to_block(c_path) {
@@ -863,6 +1156,13 @@ pub unsafe extern "C" fn open(
         return aasset;
     }
     
+    if is_bow_render_file(c_path) {
+        log::info!("Intercepting  bow render controller file with new content: {}", c_path.display());
+        let buffer = CUSTOM_BOW_RENDER_CONTROLLER.as_bytes().to_vec();
+        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
+        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(buffer));
+        return aasset;
+    }
     
     // No hurt cam camera replacements
     if is_no_hurt_cam_enabled() {
@@ -958,6 +1258,60 @@ if is_particles_disabler_file(c_path) {
     return aasset;
 }
 
+if is_items_json_file(c_path) {
+        log::info!("Checking item file for eat animation: {}", c_path.display());
+
+        if !aasset.is_null() {
+            let length = ndk_sys::AAsset_getLength(aasset) as usize;
+            if length > 0 {
+                let mut original_data = vec![0u8; length];
+                let bytes_read = ndk_sys::AAsset_read(
+                    aasset,
+                    original_data.as_mut_ptr() as *mut libc::c_void,
+                    length,
+                );
+
+                if bytes_read == length as i32 {
+                    ndk_sys::AAsset_seek(aasset, 0, libc::SEEK_SET);
+
+                    if let Some(modified_data) = remove_eat_animation(&original_data) {
+                        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
+                        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(modified_data));
+                    }
+                }
+            }
+        }
+
+        return aasset;
+    }
+    
+    if is_fancy_json_file(c_path) {
+        log::info!("Checking fancy.json for portal optimizer: {}", c_path.display());
+
+        if !aasset.is_null() {
+            let length = ndk_sys::AAsset_getLength(aasset) as usize;
+            if length > 0 {
+                let mut original_data = vec![0u8; length];
+                let bytes_read = ndk_sys::AAsset_read(
+                    aasset,
+                    original_data.as_mut_ptr() as *mut libc::c_void,
+                    length,
+                );
+
+                if bytes_read == length as i32 {
+                    ndk_sys::AAsset_seek(aasset, 0, libc::SEEK_SET);
+
+                    if let Some(modified_data) = remove_portal_fancy_define(&original_data) {
+                        let mut wanted_lock = WANTED_ASSETS_MUTEX.lock().unwrap();
+                        wanted_lock.insert(AAssetPtr(aasset), Cursor::new(modified_data));
+                    }
+                }
+            }
+        }
+
+        return aasset;
+    }
+
 if pack_icn_file(c_path) {
     log::info!("Intercepting with pack icon: {}", c_path.display());
     let buffer = PACK_ICN_PNG.to_vec();
@@ -966,7 +1320,6 @@ if pack_icn_file(c_path) {
     return aasset;
 }
     
-// Xelo end
     
     let mut sus = MC_FILELOADER.lock().ignore_poison();
     if let Some(yay) = sus.get_file(c_path, manager) {
